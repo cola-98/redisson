@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package org.redisson.executor;
 import org.redisson.api.RExecutorFuture;
 
 import java.lang.ref.ReferenceQueue;
-import java.lang.ref.WeakReference;
+import java.lang.ref.SoftReference;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -26,7 +26,7 @@ import java.util.concurrent.CompletableFuture;
  * @author Nikita Koksharov
  *
  */
-public class RedissonExecutorFutureReference extends WeakReference<RExecutorFuture<?>> {
+public class RedissonExecutorFutureReference extends SoftReference<RExecutorFuture<?>> {
 
     private final CompletableFuture<?> promise;
     private final String requestId;

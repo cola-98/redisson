@@ -1,16 +1,17 @@
 package org.redisson;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-import java.util.Arrays;
-import java.util.List;
-import java.util.NoSuchElementException;
-
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RQueue;
 
-public class RedissonQueueTest extends BaseTest {
+import java.util.Arrays;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+public class RedissonQueueTest extends RedisDockerTest {
 
     <T> RQueue<T> getQueue() {
         return redisson.getQueue("queue");
@@ -40,6 +41,32 @@ public class RedissonQueueTest extends BaseTest {
         Assertions.assertEquals((Integer)1, queue.poll());
         assertThat(queue).containsExactly(2, 3, 4);
         Assertions.assertEquals((Integer)2, queue.element());
+    }
+
+    public static class TestModel {
+        private String key;
+        private String traceId;
+        private long createdAt;
+        private UUID uuid = UUID.randomUUID();
+
+        public TestModel() {
+        }
+
+        public TestModel(String key, String traceId, long createdAt) {
+            this.key = key;
+            this.traceId = traceId;
+            this.createdAt = createdAt;
+        }
+
+    }
+
+    @Test
+    public void testRemoveWithCodec() {
+        RQueue<TestModel> queue = redisson.getQueue("queue");
+
+        TestModel msg = new TestModel("key", "traceId", 0L);
+        queue.add(msg);
+        assertThat(queue.contains(queue.peek())).isTrue();
     }
 
     @Test

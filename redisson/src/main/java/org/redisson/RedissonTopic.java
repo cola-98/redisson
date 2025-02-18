@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ import org.redisson.pubsub.PublishSubscribeService;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -51,11 +52,11 @@ public class RedissonTopic implements RTopic {
     final Codec codec;
 
     public RedissonTopic(CommandAsyncExecutor commandExecutor, String name) {
-        this(commandExecutor.getConnectionManager().getCodec(), commandExecutor, name);
+        this(commandExecutor.getServiceManager().getCfg().getCodec(), commandExecutor, name);
     }
 
     public static RedissonTopic createRaw(CommandAsyncExecutor commandExecutor, String name) {
-        return new RedissonTopic(commandExecutor.getConnectionManager().getCodec(), commandExecutor, NameMapper.direct(), name);
+        return new RedissonTopic(commandExecutor.getServiceManager().getCfg().getCodec(), commandExecutor, NameMapper.direct(), name);
     }
 
     public static RedissonTopic createRaw(Codec codec, CommandAsyncExecutor commandExecutor, String name) {
@@ -63,14 +64,14 @@ public class RedissonTopic implements RTopic {
     }
 
     public RedissonTopic(Codec codec, CommandAsyncExecutor commandExecutor, String name) {
-        this(codec, commandExecutor, commandExecutor.getConnectionManager().getConfig().getNameMapper(), name);
+        this(codec, commandExecutor, commandExecutor.getServiceManager().getConfig().getNameMapper(), name);
     }
 
     public RedissonTopic(Codec codec, CommandAsyncExecutor commandExecutor, NameMapper nameMapper, String name) {
         this.commandExecutor = commandExecutor;
         this.name = nameMapper.map(name);
         this.channelName = new ChannelName(this.name);
-        this.codec = codec;
+        this.codec = commandExecutor.getServiceManager().getCodec(codec);
         this.subscribeService = commandExecutor.getConnectionManager().getSubscribeService();
     }
 
@@ -88,13 +89,9 @@ public class RedissonTopic implements RTopic {
         return name;
     }
 
-    protected String getName(Object o) {
-        return name;
-    }
-
     @Override
     public RFuture<Long> publishAsync(Object message) {
-        String name = getName(message);
+        String name = getName();
         return commandExecutor.writeAsync(name, StringCodec.INSTANCE, RedisCommands.PUBLISH, name, commandExecutor.encode(codec, message));
     }
 
@@ -106,7 +103,7 @@ public class RedissonTopic implements RTopic {
 
     @Override
     public <M> int addListener(Class<M> type, MessageListener<? extends M> listener) {
-        RFuture<Integer> future = addListenerAsync(type, (MessageListener<M>) listener);
+        RFuture<Integer> future = addListenerAsync(type, listener);
         return commandExecutor.get(future.toCompletableFuture());
     }
 
@@ -117,14 +114,26 @@ public class RedissonTopic implements RTopic {
     }
 
     @Override
-    public <M> RFuture<Integer> addListenerAsync(Class<M> type, MessageListener<M> listener) {
-        PubSubMessageListener<M> pubSubListener = new PubSubMessageListener<>(type, listener, name);
+    public <M> RFuture<Integer> addListenerAsync(Class<M> type, MessageListener<? extends M> listener) {
+        PubSubMessageListener<M> pubSubListener = new PubSubMessageListener<>(type, (MessageListener<M>) listener, name);
         return addListenerAsync(pubSubListener);
     }
 
     protected RFuture<Integer> addListenerAsync(RedisPubSubListener<?> pubSubListener) {
-        CompletableFuture<PubSubConnectionEntry> future = subscribeService.subscribe(codec, channelName, pubSubListener);
+        CompletableFuture<List<PubSubConnectionEntry>> future = subscribeService.subscribe(codec, channelName, pubSubListener);
         CompletableFuture<Integer> f = future.thenApply(res -> {
+            if (pubSubListener instanceof PubSubStatusListener
+                    && subscribeService.isMultiEntity(channelName)) {
+                // replaced in subscribe() method
+                Optional<RedisPubSubListener<?>> l = res.stream()
+                        .flatMap(r -> r.getListeners(channelName).stream())
+                        .filter(r -> r instanceof PubSubStatusListener
+                                && ((PubSubStatusListener) pubSubListener).getListener() == ((PubSubStatusListener) r).getListener())
+                        .findAny();
+                if (l.isPresent()) {
+                    return System.identityHashCode(l.get());
+                }
+            }
             return System.identityHashCode(pubSubListener);
         });
         return new CompletableFutureWrapper<>(f);
@@ -166,11 +175,7 @@ public class RedissonTopic implements RTopic {
 
     @Override
     public int countListeners() {
-        PubSubConnectionEntry entry = subscribeService.getPubSubEntry(channelName);
-        if (entry != null) {
-            return entry.countListeners(channelName);
-        }
-        return 0;
+        return subscribeService.countListeners(channelName);
     }
 
     @Override

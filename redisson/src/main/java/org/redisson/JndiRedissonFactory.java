@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,7 +54,8 @@ public class JndiRedissonFactory implements ObjectFactory {
             try {
                 config = Config.fromJSON(new File(configPath), getClass().getClassLoader());
             } catch (IOException e1) {
-                NamingException ex = new NamingException("Can't parse yaml config " + configPath);
+                NamingException ex = new NamingException("Can't parse config " + configPath);
+                e1.addSuppressed(e);
                 ex.initCause(e1);
                 throw ex;
             }

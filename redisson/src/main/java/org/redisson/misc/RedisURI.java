@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,12 @@ package org.redisson.misc;
 
 import io.netty.util.NetUtil;
 
+import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
 /**
@@ -27,59 +30,95 @@ import java.util.Objects;
  * @author Nikita Koksharov
  *
  */
-public class RedisURI {
+public final class RedisURI {
 
-    private final boolean ssl;
+    public static final String REDIS_PROTOCOL= "redis://";
+    public static final String REDIS_SSL_PROTOCOL = "rediss://";
+    public static final String REDIS_UDS_PROTOCOL= "redis+uds://";
+
+    public static final String VALKEY_PROTOCOL= "valkey://";
+    public static final String VALKEY_SSL_PROTOCOL = "valkeys://";
+    public static final String VALKEY_UDS_PROTOCOL= "valkey+uds://";
+
+    private final String scheme;
     private final String host;
     private final int port;
     private String username;
     private String password;
+    private int hashCode;
+
+    public static boolean isValid(String url) {
+        return url.startsWith(REDIS_PROTOCOL)
+                || url.startsWith(REDIS_SSL_PROTOCOL)
+                    || url.startsWith(VALKEY_PROTOCOL)
+                        || url.startsWith(VALKEY_SSL_PROTOCOL)
+                            || url.startsWith(REDIS_UDS_PROTOCOL)
+                                || url.startsWith(VALKEY_UDS_PROTOCOL);
+    }
 
     public RedisURI(String scheme, String host, int port) {
-        this.ssl = "rediss".equals(scheme);
+        this.scheme = scheme;
         this.host = host;
         this.port = port;
+        this.hashCode = Objects.hash(isSsl(), host, port);
     }
 
     public RedisURI(String uri) {
-        if (!uri.startsWith("redis://")
-                && !uri.startsWith("rediss://")) {
+        if (!isValid(uri)) {
             throw new IllegalArgumentException("Redis url should start with redis:// or rediss:// (for SSL connection)");
         }
-        
-        String urlHost = uri.replaceFirst("redis://", "http://").replaceFirst("rediss://", "http://");
-        String ipV6Host = uri.substring(uri.indexOf("://")+3, uri.lastIndexOf(":"));
-        if (ipV6Host.contains("@")) {
-            ipV6Host = ipV6Host.split("@")[1];
-        }
-        if (ipV6Host.contains(":")) {
-            urlHost = urlHost.replace(ipV6Host, "[" + ipV6Host + "]");
-        }
+
+        scheme = uri.split("://")[0];
 
         try {
+            if (isUDS()) {
+                host = uri.split("://")[1];
+                port = 0;
+                return;
+            }
+
+            if (uri.split(":").length < 3) {
+                throw new IllegalArgumentException("Redis url doesn't contain a port");
+            }
+
+            String urlHost = parseUrl(uri);
+
             URL url = new URL(urlHost);
             if (url.getUserInfo() != null) {
                 String[] details = url.getUserInfo().split(":", 2);
                 if (details.length == 2) {
                     if (!details[0].isEmpty()) {
-                        username = details[0];
+                        username = URLDecoder.decode(details[0], StandardCharsets.UTF_8.toString());
                     }
-                    password = details[1];
+                    password = URLDecoder.decode(details[1], StandardCharsets.UTF_8.toString());
                 }
             }
+            if (url.getHost().isEmpty()) {
+                throw new IllegalArgumentException("Redis host can't be parsed");
+            }
+
             host = url.getHost();
             port = url.getPort();
-            ssl = uri.startsWith("rediss://");
-        } catch (MalformedURLException e) {
+        } catch (MalformedURLException | UnsupportedEncodingException e) {
             throw new IllegalArgumentException(e);
         }
     }
-    
-    public String getScheme() {
-        if (ssl) {
-            return "rediss";
+
+    private String parseUrl(String uri) {
+        int hostStartIndex = uri.indexOf("://") + 3;
+        String urlHost = "http://" + uri.substring(hostStartIndex);
+        String ipV6Host = uri.substring(hostStartIndex, uri.lastIndexOf(":"));
+        if (ipV6Host.contains("@")) {
+            ipV6Host = ipV6Host.split("@")[1];
         }
-        return "redis";
+        if (ipV6Host.contains(":") && !ipV6Host.startsWith("[")) {
+            urlHost = urlHost.replace(ipV6Host, "[" + ipV6Host + "]");
+        }
+        return urlHost;
+    }
+
+    public String getScheme() {
+        return scheme;
     }
 
     public String getUsername() {
@@ -91,7 +130,7 @@ public class RedisURI {
     }
 
     public boolean isSsl() {
-        return ssl;
+        return "rediss".equals(scheme) || "valkeys".equals(scheme);
     }
 
     public String getHost() {
@@ -102,21 +141,26 @@ public class RedisURI {
         return port;
     }
 
+    public boolean isUDS() {
+        return "redis+uds".equals(scheme) || "valkey+uds".equals(scheme);
+    }
+
     public boolean isIP() {
         return NetUtil.createByteArrayFromIpAddressString(host) != null;
     }
 
-    private static String trimIpv6Brackets(String host) {
+    private String trimIpv6Brackets(String host) {
         if (host.startsWith("[") && host.endsWith("]")) {
             return host.substring(1, host.length() - 1);
         }
         return host;
     }
     
-    public static boolean compare(InetSocketAddress entryAddr, RedisURI addr) {
-        if (((entryAddr.getHostName() != null && entryAddr.getHostName().equals(trimIpv6Brackets(addr.getHost())))
-                || entryAddr.getAddress().getHostAddress().equals(trimIpv6Brackets(addr.getHost())))
-                && entryAddr.getPort() == addr.getPort()) {
+    public boolean equals(InetSocketAddress entryAddr) {
+        String ip = trimIpv6Brackets(getHost());
+        if (((entryAddr.getHostName() != null && entryAddr.getHostName().equals(ip))
+                || entryAddr.getAddress().getHostAddress().equals(ip))
+                && entryAddr.getPort() == getPort()) {
             return true;
         }
         return false;
@@ -127,12 +171,12 @@ public class RedisURI {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         RedisURI redisURI = (RedisURI) o;
-        return ssl == redisURI.ssl && port == redisURI.port && Objects.equals(host, redisURI.host);
+        return isSsl() == redisURI.isSsl() && port == redisURI.port && Objects.equals(host, redisURI.host);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(ssl, host, port);
+        return hashCode;
     }
 
     @Override

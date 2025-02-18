@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,6 +45,8 @@ public class ClusterServersConfig extends BaseMasterSlaveServersConfig<ClusterSe
 
     private boolean checkSlotsCoverage = true;
 
+    private ShardedSubscriptionMode shardedSubscriptionMode = ShardedSubscriptionMode.AUTO;
+
     public ClusterServersConfig() {
     }
 
@@ -54,6 +56,7 @@ public class ClusterServersConfig extends BaseMasterSlaveServersConfig<ClusterSe
         setScanInterval(config.getScanInterval());
         setNatMapper(config.getNatMapper());
         setCheckSlotsCoverage(config.isCheckSlotsCoverage());
+        setShardedSubscriptionMode(config.getShardedSubscriptionMode());
     }
 
     /**
@@ -98,7 +101,7 @@ public class ClusterServersConfig extends BaseMasterSlaveServersConfig<ClusterSe
      * <p>
      * Default is <code>true</code>
      *
-     * @param checkSlotsCoverage - boolean value
+     * @param checkSlotsCoverage boolean value
      * @return config
      */
     public ClusterServersConfig setCheckSlotsCoverage(boolean checkSlotsCoverage) {
@@ -128,13 +131,31 @@ public class ClusterServersConfig extends BaseMasterSlaveServersConfig<ClusterSe
      * @see HostNatMapper
      * @see HostPortNatMapper
      *
-     * @param natMapper - nat mapper object
+     * @param natMapper nat mapper object
      * @return config
      */
     public ClusterServersConfig setNatMapper(NatMapper natMapper) {
         this.natMapper = natMapper;
         return this;
     }
-    
 
+    public ShardedSubscriptionMode getShardedSubscriptionMode() {
+        return shardedSubscriptionMode;
+    }
+
+    /**
+     * Defines whether to use sharded subscription feature available in Redis 7.0+.
+     * <p>
+     * Used in RMapCache, RLocalCachedMap, RCountDownLatch, RLock, RPermitExpirableSemaphore,
+     * RSemaphore, RLongAdder, RDoubleAdder, Micronaut Session, Apache Tomcat Manager objects.
+     * <p>
+     * Default is <code>AUTO</code>
+     *
+     * @param shardedSubscriptionMode param
+     * @return config
+     */
+    public ClusterServersConfig setShardedSubscriptionMode(ShardedSubscriptionMode shardedSubscriptionMode) {
+        this.shardedSubscriptionMode = shardedSubscriptionMode;
+        return this;
+    }
 }

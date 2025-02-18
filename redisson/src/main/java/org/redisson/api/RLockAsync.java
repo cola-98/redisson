@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit;
  * @author Nikita Koksharov
  *
  */
-public interface RLockAsync {
+public interface RLockAsync extends RObservableAsync {
 
     /**
      * Unlocks the lock independently of its state
@@ -148,7 +148,16 @@ public interface RLockAsync {
      * @return <code>true</code> if lock acquired otherwise <code>false</code>
      */
     RFuture<Boolean> tryLockAsync(long waitTime, long leaseTime, TimeUnit unit, long threadId);
-    
+
+    /**
+     * Checks if the lock is held by thread with defined <code>threadId</code>
+     *
+     * @param threadId Thread ID of locking thread
+     * @return <code>true</code> if held by thread with given id
+     *          otherwise <code>false</code>
+     */
+    RFuture<Boolean> isHeldByThreadAsync(long threadId);
+
     /**
      * Number of holds on this lock by the current thread
      *

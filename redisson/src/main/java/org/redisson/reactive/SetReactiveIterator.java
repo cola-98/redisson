@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ public abstract class SetReactiveIterator<V> implements Consumer<FluxSink<V>> {
             }
 
             @Override
-            protected RFuture<ScanResult<Object>> scanIterator(RedisClient client, long nextIterPos) {
+            protected RFuture<ScanResult<Object>> scanIterator(RedisClient client, String nextIterPos) {
                 return SetReactiveIterator.this.scanIterator(client, nextIterPos);
             }
         });
@@ -49,6 +49,6 @@ public abstract class SetReactiveIterator<V> implements Consumer<FluxSink<V>> {
         return false;
     }
     
-    protected abstract RFuture<ScanResult<Object>> scanIterator(RedisClient client, long nextIterPos);
+    protected abstract RFuture<ScanResult<Object>> scanIterator(RedisClient client, String nextIterPos);
 
 }

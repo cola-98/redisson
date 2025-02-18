@@ -14,7 +14,9 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.types.Expiration;
+import org.springframework.data.redis.core.types.RedisClientInfo;
 
+import java.util.List;
 import java.util.Set;
 
 public class RedissonConnectionTest extends BaseConnectionTest {
@@ -123,5 +125,20 @@ public class RedissonConnectionTest extends BaseConnectionTest {
         assertThat(t.next().getValue()).isEqualTo("value2".getBytes());
     }
 
-    
+    @Test
+    public void testZPopMin() {
+        connection.zAdd("key".getBytes(), 1, "value1".getBytes());
+        connection.zAdd("key".getBytes(), 2, "value2".getBytes());
+
+        RedisZSetCommands.Tuple r = connection.zPopMin("key".getBytes());
+        assertThat(r.getValue()).isEqualTo("value1".getBytes());
+        assertThat(r.getScore()).isEqualTo(1);
+    }
+
+    @Test
+    public void testGetClientList() {
+        List<RedisClientInfo> info = connection.getClientList();
+        assertThat(info.size()).isGreaterThan(10);
+    }
+
 }

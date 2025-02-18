@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package org.redisson.api;
 
+import org.redisson.api.options.KeysScanOptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -150,49 +151,41 @@ public interface RKeysReactive {
      * @return keys
      */
     Flux<String> getKeys();
-    
+
     /**
-     * Load keys in incrementally iterate mode. Keys traversed with SCAN operation.
-     * Each SCAN operation loads up to <code>count</code> keys per request.
+     * Get all keys using iterable. Keys traversing with SCAN operation.
+     *
+     * @param options scan options
+     * @return Iterable object
+     */
+    Flux<String> getKeys(KeysScanOptions options);
+
+    /**
+     * Use {@link #getKeys(KeysScanOptions)} instead.
      *
      * @param count - keys loaded per request to Redis
      * @return keys
      */
+    @Deprecated
     Flux<String> getKeys(int count);
 
     /**
-     * Find keys by pattern and load it in incrementally iterate mode.
-     * Keys traversed with SCAN operation.
-     * Each SCAN operation loads up to 10 keys per request.
-     * <p>
-     *
-     *  Supported glob-style patterns:
-     *    h?llo subscribes to hello, hallo and hxllo
-     *    h*llo subscribes to hllo and heeeello
-     *    h[ae]llo subscribes to hello and hallo, but not hillo
+     * Use {@link #getKeys(KeysScanOptions)} instead.
      *
      * @param pattern - match pattern
      * @return keys
      */
+    @Deprecated
     Flux<String> getKeysByPattern(String pattern);
 
     /**
-     * Get all keys by pattern using iterator. 
-     * Keys traversed with SCAN operation. Each SCAN operation loads 
-     * up to <code>count</code> keys per request. 
-     * <p>
-     *  Supported glob-style patterns:
-     *  <p>
-     *    h?llo subscribes to hello, hallo and hxllo
-     *    <p>
-     *    h*llo subscribes to hllo and heeeello
-     *    <p>
-     *    h[ae]llo subscribes to hello and hallo, but not hillo
+     * Use {@link #getKeys(KeysScanOptions)} instead.
      *
      * @param pattern - match pattern
      * @param count - keys loaded per request to Redis
      * @return keys
      */
+    @Deprecated
     Flux<String> getKeysByPattern(String pattern, int count);
     
     /**
@@ -229,6 +222,21 @@ public interface RKeysReactive {
      * @return deleted objects amount
      */
     Mono<Long> deleteByPattern(String pattern);
+
+    /**
+     * Unlink multiple objects by a key pattern.
+     *
+     * Uses Lua script.
+     *
+     *  Supported glob-style patterns:
+     *    h?llo subscribes to hello, hallo and hxllo
+     *    h*llo subscribes to hllo and heeeello
+     *    h[ae]llo subscribes to hello and hallo, but not hillo
+     *
+     * @param pattern - match pattern
+     * @return deleted objects amount
+     */
+    Mono<Long> unlinkByPattern(String pattern);
 
     /**
      * Delete multiple objects by name.
@@ -269,8 +277,7 @@ public interface RKeysReactive {
 
     /**
      * Swap two databases.
-     * <p>
-     * Requires Redis 4.0+
+     * <p>     * Requires Redis 4.0+
      *
      * @return void
      */
@@ -304,5 +311,28 @@ public interface RKeysReactive {
      * @return void
      */
     Mono<Void> flushallParallel();
+
+    /**
+     * Adds global object event listener
+     * which is invoked for each Redisson object.
+     *
+     * @see org.redisson.api.listener.TrackingListener
+     * @see org.redisson.api.listener.SetObjectListener
+     * @see org.redisson.api.listener.NewObjectListener
+     * @see org.redisson.api.listener.FlushListener
+     * @see org.redisson.api.ExpiredObjectListener
+     * @see org.redisson.api.DeletedObjectListener
+     *
+     * @param listener object event listener
+     * @return listener id
+     */
+    Mono<Integer> addListener(ObjectListener listener);
+
+    /**
+     * Removes global object event listener
+     *
+     * @param listenerId - listener id
+     */
+    Mono<Void> removeListener(int listenerId);
 
 }

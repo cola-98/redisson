@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,9 @@
  */
 package org.redisson;
 
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 
@@ -25,24 +26,35 @@ import java.util.concurrent.ConcurrentMap;
  */
 public class QueueTransferService {
 
-    private final ConcurrentMap<String, QueueTransferTask> tasks = new ConcurrentHashMap<>();
+    private final Map<String, QueueTransferTask> tasks = new ConcurrentHashMap<>();
     
-    public synchronized void schedule(String name, QueueTransferTask task) {
-        QueueTransferTask oldTask = tasks.putIfAbsent(name, task);
-        if (oldTask == null) {
-            task.start();
-        } else {
-            oldTask.incUsage();
-        }
+    public void schedule(String name, QueueTransferTask task) {
+        tasks.compute(name, (k, t) -> {
+            if (t == null) {
+                task.start();
+                return task;
+            }
+            t.incUsage();
+            return t;
+        });
     }
     
-    public synchronized void remove(String name) {
-        QueueTransferTask task = tasks.get(name);
-        if (task != null) {
-            if (task.decUsage() == 0) {
-                tasks.remove(name, task);
-                task.stop();
+    public void remove(String name) {
+        AtomicReference<QueueTransferTask> ref = new AtomicReference<>();
+        tasks.compute(name, (k, task) -> {
+            if (task == null) {
+                return null;
             }
+
+            if (task.decUsage() == 0) {
+                ref.set(task);
+                return null;
+            }
+            return task;
+        });
+
+        if (ref.get() != null) {
+            ref.get().stop();
         }
     }
     

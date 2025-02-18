@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,13 +21,12 @@ import org.redisson.api.listener.PatternMessageListener;
 import org.redisson.api.listener.PatternStatusListener;
 import org.redisson.client.ChannelName;
 import org.redisson.client.RedisPubSubListener;
-import org.redisson.client.RedisTimeoutException;
 import org.redisson.client.codec.Codec;
+import org.redisson.client.codec.StringCodec;
+import org.redisson.client.protocol.RedisCommands;
 import org.redisson.client.protocol.pubsub.PubSubType;
 import org.redisson.command.CommandAsyncExecutor;
-import org.redisson.config.MasterSlaveServersConfig;
 import org.redisson.misc.CompletableFutureWrapper;
-import org.redisson.pubsub.AsyncSemaphore;
 import org.redisson.pubsub.PubSubConnectionEntry;
 import org.redisson.pubsub.PublishSubscribeService;
 
@@ -51,14 +50,14 @@ public class RedissonPatternTopic implements RPatternTopic {
     private final Codec codec;
 
     protected RedissonPatternTopic(CommandAsyncExecutor commandExecutor, String name) {
-        this(commandExecutor.getConnectionManager().getCodec(), commandExecutor, name);
+        this(commandExecutor.getServiceManager().getCfg().getCodec(), commandExecutor, name);
     }
 
-    protected RedissonPatternTopic(Codec codec, CommandAsyncExecutor commandExecutor, String name) {
+    public RedissonPatternTopic(Codec codec, CommandAsyncExecutor commandExecutor, String name) {
         this.commandExecutor = commandExecutor;
         this.name = name;
         this.channelName = new ChannelName(name);
-        this.codec = codec;
+        this.codec = commandExecutor.getServiceManager().getCodec(codec);
         this.subscribeService = commandExecutor.getConnectionManager().getSubscribeService();
     }
 
@@ -99,23 +98,15 @@ public class RedissonPatternTopic implements RPatternTopic {
         return new CompletableFutureWrapper<>(f);
     }
     
-    protected void acquire(AsyncSemaphore semaphore) {
-        MasterSlaveServersConfig config = commandExecutor.getConnectionManager().getConfig();
-        int timeout = config.getTimeout() + config.getRetryInterval() * config.getRetryAttempts();
-        if (!semaphore.tryAcquire(timeout)) {
-            throw new RedisTimeoutException("Remove listeners operation timeout: (" + timeout + "ms) for " + name + " topic");
-        }
-    }
-    
     @Override
-    public RFuture<Void> removeListenerAsync(int listenerId) {
-        CompletableFuture<Void> f = subscribeService.removeListenerAsync(PubSubType.PUNSUBSCRIBE, channelName, listenerId);
+    public RFuture<Void> removeListenerAsync(Integer... ids) {
+        CompletableFuture<Void> f = subscribeService.removeListenerAsync(PubSubType.PUNSUBSCRIBE, channelName, ids);
         return new CompletableFutureWrapper<>(f);
     }
     
     @Override
-    public void removeListener(int listenerId) {
-        commandExecutor.get(removeListenerAsync(listenerId).toCompletableFuture());
+    public void removeListener(Integer... ids) {
+        commandExecutor.get(removeListenerAsync(ids).toCompletableFuture());
     }
     
     @Override
@@ -138,6 +129,16 @@ public class RedissonPatternTopic implements RPatternTopic {
     @Override
     public List<String> getPatternNames() {
         return Collections.singletonList(name);
+    }
+
+    @Override
+    public RFuture<List<String>> getActiveTopicsAsync() {
+        return commandExecutor.writeAsync(name, StringCodec.INSTANCE, RedisCommands.PUBSUB_CHANNELS, name);
+    }
+
+    @Override
+    public List<String> getActiveTopics() {
+        return commandExecutor.get(getActiveTopicsAsync());
     }
 
 }

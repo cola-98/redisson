@@ -5,13 +5,13 @@
     <parent>
         <groupId>org.redisson</groupId>
         <artifactId>redisson-quarkus-20-parent</artifactId>
-        <version>3.17.7-SNAPSHOT</version>
+        <version>3.44.1-SNAPSHOT</version>
         <relativePath>../</relativePath>
     </parent>
 
     <artifactId>redisson-quarkus-20-deployment</artifactId>
 
-    <name>Redisson/Quarkus v2.0.x deployment</name>
+    <name>Redisson Quarkus v2.x.x deployment</name>
 
     <dependencies>
       <dependency>
@@ -38,7 +38,7 @@
         <plugin>
             <groupId>com.mycila</groupId>
             <artifactId>license-maven-plugin</artifactId>
-            <version>4.1</version>
+            <version>4.5</version>
             <configuration>
                 <basedir>${basedir}</basedir>
                 <header>${basedir}/../../../header.txt</header>

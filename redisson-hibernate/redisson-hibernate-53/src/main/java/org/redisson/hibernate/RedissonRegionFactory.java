@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -73,7 +73,7 @@ public class RedissonRegionFactory extends RegionFactoryTemplate {
 
     public static final String FALLBACK = CONFIG_PREFIX + "fallback";
 
-    private RedissonClient redisson;
+    RedissonClient redisson;
     private CacheKeysFactory cacheKeysFactory;
     protected boolean fallback;
 
@@ -124,7 +124,8 @@ public class RedissonRegionFactory extends RegionFactoryTemplate {
             try {
                 return Config.fromJSON(new File(configPath));
             } catch (IOException e1) {
-                throw new CacheException("Can't parse default yaml config", e1);
+                e1.addSuppressed(e);
+                throw new CacheException("Can't parse default config", e1);
             }
         }
     }
@@ -139,7 +140,8 @@ public class RedissonRegionFactory extends RegionFactoryTemplate {
                     is = classLoader.getResourceAsStream(fileName);
                     return Config.fromJSON(is);
                 } catch (IOException e1) {
-                    throw new CacheException("Can't parse yaml config", e1);
+                    e1.addSuppressed(e);
+                    throw new CacheException("Can't parse config", e1);
                 }
             }
         }
@@ -212,7 +214,7 @@ public class RedissonRegionFactory extends RegionFactoryTemplate {
         }
 
         RMapCache<Object, Object> mapCache = getCache(qualifyName(regionConfig.getRegionName()), buildingContext.getSessionFactory().getProperties(), defaultKey);
-        return new RedissonStorage(mapCache, ((Redisson)redisson).getConnectionManager(), buildingContext.getSessionFactory().getProperties(), defaultKey);
+        return new RedissonStorage(mapCache, ((Redisson)redisson).getServiceManager(), buildingContext.getSessionFactory().getProperties(), defaultKey);
     }
 
     private String qualifyName(String name) {
@@ -223,14 +225,14 @@ public class RedissonRegionFactory extends RegionFactoryTemplate {
     protected StorageAccess createQueryResultsRegionStorageAccess(String regionName,
             SessionFactoryImplementor sessionFactory) {
         RMapCache<Object, Object> mapCache = getCache(qualifyName(regionName), sessionFactory.getProperties(), QUERY_DEF);
-        return new RedissonStorage(mapCache, ((Redisson)redisson).getConnectionManager(), sessionFactory.getProperties(), QUERY_DEF);
+        return new RedissonStorage(mapCache, ((Redisson)redisson).getServiceManager(), sessionFactory.getProperties(), QUERY_DEF);
     }
 
     @Override
     protected StorageAccess createTimestampsRegionStorageAccess(String regionName,
             SessionFactoryImplementor sessionFactory) {
         RMapCache<Object, Object> mapCache = getCache(qualifyName(regionName), sessionFactory.getProperties(), TIMESTAMPS_DEF);
-        return new RedissonStorage(mapCache, ((Redisson)redisson).getConnectionManager(), sessionFactory.getProperties(), TIMESTAMPS_DEF);
+        return new RedissonStorage(mapCache, ((Redisson)redisson).getServiceManager(), sessionFactory.getProperties(), TIMESTAMPS_DEF);
     }
 
     protected RMapCache<Object, Object> getCache(String regionName, Map properties, String defaultKey) {

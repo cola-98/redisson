@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,9 @@
 package org.redisson.api;
 
 import io.netty.buffer.ByteBufUtil;
+import org.redisson.misc.RandomXoshiro256PlusPlus;
 
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.Random;
 
 /**
  * Random identifier
@@ -27,10 +28,12 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class RandomIdGenerator implements IdGenerator {
 
+    private static final Random RANDOM = RandomXoshiro256PlusPlus.create();
+
     @Override
     public String generateId() {
         byte[] id = new byte[16];
-        ThreadLocalRandom.current().nextBytes(id);
+        RANDOM.nextBytes(id);
         return ByteBufUtil.hexDump(id);
     }
 

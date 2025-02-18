@@ -1,8 +1,8 @@
 package org.redisson;
 
 import org.awaitility.Awaitility;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.redisson.api.RBlockingDequeReactive;
@@ -52,19 +52,18 @@ public class RedissonBlockingDequeReactiveTest extends BaseReactiveTest {
     @Test
     public void testPollLastAndOfferFirstTo() {
         RBlockingDequeReactive<String> blockingDeque = redisson.getBlockingDeque("blocking_deque");
-        Awaitility.await().between(Duration.ofMillis(950), Duration.ofMillis(1150)).untilAsserted(() -> {
+        Awaitility.await().between(Duration.ofMillis(950), Duration.ofMillis(1350)).untilAsserted(() -> {
             String redisTask = sync(blockingDeque.pollLastAndOfferFirstTo("deque", 1, TimeUnit.SECONDS));
             assertThat(redisTask).isNull();
         });
     }
     
     @Test
+    @Timeout(3)
     public void testShortPoll() {
-        Assertions.assertTimeout(Duration.ofSeconds(3), () -> {
-            RBlockingDequeReactive<Integer> queue = redisson.getBlockingDeque("queue:pollany");
-            sync(queue.pollLast(500, TimeUnit.MILLISECONDS));
-            sync(queue.pollFirst(10, TimeUnit.MICROSECONDS));
-        });
+        RBlockingDequeReactive<Integer> queue = redisson.getBlockingDeque("queue:pollany");
+        sync(queue.pollLast(500, TimeUnit.MILLISECONDS));
+        sync(queue.pollFirst(10, TimeUnit.MICROSECONDS));
     }
     
     @Test

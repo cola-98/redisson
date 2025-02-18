@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package org.redisson;
 
 import io.netty.buffer.ByteBufUtil;
 import org.redisson.api.RExecutorService;
+import org.redisson.api.RScheduledExecutorService;
 import org.redisson.api.RedissonClient;
 import org.redisson.api.WorkerOptions;
 import org.redisson.client.RedisConnection;
@@ -30,7 +31,9 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.HashSet;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -43,8 +46,9 @@ import java.util.concurrent.TimeUnit;
 public final class RedissonNode {
 
     private static final Logger log = LoggerFactory.getLogger(RedissonNode.class);
-    
-    private boolean hasRedissonInstance;
+
+    private final Set<RExecutorService> executors = new HashSet<>();
+    private final boolean hasRedissonInstance;
     private RedissonClient redisson;
     private final RedissonNodeConfig config;
     private final String id;
@@ -61,11 +65,13 @@ public final class RedissonNode {
     public RedissonClient getRedisson() {
         return redisson;
     }
-    
+
+    @Deprecated
     public InetSocketAddress getLocalAddress() {
         return localAddress;
     }
-    
+
+    @Deprecated
     public InetSocketAddress getRemoteAddress() {
         return remoteAddress;
     }
@@ -88,14 +94,14 @@ public final class RedissonNode {
         String configPath = args[0];
         RedissonNodeFileConfig config = null;
         try {
-            config = RedissonNodeFileConfig.fromJSON(new File(configPath));
+            config = RedissonNodeFileConfig.fromYAML(new File(configPath));
         } catch (IOException e) {
             // trying next format
             try {
-                config = RedissonNodeFileConfig.fromYAML(new File(configPath));
+                config = RedissonNodeFileConfig.fromJSON(new File(configPath));
             } catch (IOException e1) {
-                log.error("Can't parse json config " + configPath, e);
-                throw new IllegalArgumentException("Can't parse yaml config " + configPath, e1);
+                e1.addSuppressed(e);
+                throw new IllegalArgumentException("Can't parse config " + configPath, e1);
             }
         }
         
@@ -116,7 +122,15 @@ public final class RedissonNode {
      */
     public void shutdown() {
         if (hasRedissonInstance) {
-            redisson.shutdown(0, 15, TimeUnit.MINUTES);
+            try {
+                for (RExecutorService executor : executors) {
+                    executor.shutdown();
+                }
+            } catch (Exception e){
+                // skip
+            }
+
+            redisson.shutdown(0, 15, TimeUnit.SECONDS);
             log.info("Redisson node has been shutdown successfully");
         }
     }
@@ -144,8 +158,10 @@ public final class RedissonNode {
             WorkerOptions options = WorkerOptions.defaults()
                                                 .workers(mapReduceWorkers)
                                                 .beanFactory(config.getBeanFactory());
-            
-            redisson.getExecutorService(RExecutorService.MAPREDUCE_NAME).registerWorkers(options);
+
+            RScheduledExecutorService e = redisson.getExecutorService(RExecutorService.MAPREDUCE_NAME);
+            e.registerWorkers(options);
+            executors.add(e);
             log.info("{} map reduce worker(s) registered", mapReduceWorkers);
         }
         
@@ -156,8 +172,10 @@ public final class RedissonNode {
             WorkerOptions options = WorkerOptions.defaults()
                                                 .workers(workers)
                                                 .beanFactory(config.getBeanFactory());
-            
-            redisson.getExecutorService(name).registerWorkers(options);
+
+            RScheduledExecutorService e = redisson.getExecutorService(name);
+            e.registerWorkers(options);
+            executors.add(e);
             log.info("{} worker(s) registered for ExecutorService with '{}' name", workers, name);
         }
 
@@ -165,12 +183,12 @@ public final class RedissonNode {
     }
 
     private void retrieveAddresses() {
-        ConnectionManager connectionManager = ((Redisson) redisson).getConnectionManager();
+        ConnectionManager connectionManager = ((Redisson) redisson).getCommandExecutor().getConnectionManager();
         for (MasterSlaveEntry entry : connectionManager.getEntrySet()) {
-            CompletionStage<RedisConnection> readFuture = entry.connectionReadOp(null);
+            CompletionStage<RedisConnection> readFuture = entry.connectionReadOp(null, false);
             RedisConnection readConnection = null;
             try {
-                readConnection = readFuture.toCompletableFuture().get(connectionManager.getConfig().getConnectTimeout(), TimeUnit.MILLISECONDS);
+                readConnection = readFuture.toCompletableFuture().get(connectionManager.getServiceManager().getConfig().getConnectTimeout(), TimeUnit.MILLISECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (Exception e) {
@@ -186,7 +204,7 @@ public final class RedissonNode {
             CompletionStage<RedisConnection> writeFuture = entry.connectionWriteOp(null);
             RedisConnection writeConnection = null;
             try {
-                writeConnection = writeFuture.toCompletableFuture().get(connectionManager.getConfig().getConnectTimeout(), TimeUnit.MILLISECONDS);
+                writeConnection = writeFuture.toCompletableFuture().get(connectionManager.getServiceManager().getConfig().getConnectTimeout(), TimeUnit.MILLISECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (Exception e) {

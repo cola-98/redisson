@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,8 +18,7 @@ package org.redisson.micronaut.cache;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.naming.Named;
 import org.redisson.api.MapOptions;
-import org.redisson.api.map.MapLoader;
-import org.redisson.api.map.MapWriter;
+import org.redisson.api.map.*;
 import org.redisson.client.codec.Codec;
 
 import java.time.Duration;
@@ -37,8 +36,8 @@ public class BaseCacheConfiguration implements Named {
     private final String name;
 
     private Codec codec;
-    private Duration expireAfterWrite;
-    private Duration expireAfterAccess;
+    private Duration expireAfterWrite = Duration.ZERO;
+    private Duration expireAfterAccess = Duration.ZERO;
     private int maxSize;
 
     public BaseCacheConfiguration(String name) {
@@ -57,10 +56,10 @@ public class BaseCacheConfiguration implements Named {
 
     /**
      * Redis data codec applied to cache entries.
-     * Default is MarshallingCodec codec
+     * Default is Kryo5Codec codec
      *
      * @see Codec
-     * @see org.redisson.codec.MarshallingCodec
+     * @see org.redisson.codec.Kryo5Codec
      *
      * @param codec - data codec
      * @return config
@@ -161,7 +160,20 @@ public class BaseCacheConfiguration implements Named {
         mapOptions.loader(loader);
     }
 
-    public MapOptions<Object, Object> getMapOptions() {
+    public <K, V> org.redisson.api.options.MapOptions<K, V> getMapOptions() {
+        org.redisson.api.options.MapOptions<K, V> ops = org.redisson.api.options.MapOptions.name(getName());
+        ops.writer((MapWriter<K, V>) mapOptions.getWriter());
+        ops.writeMode(WriteMode.valueOf(mapOptions.getWriteMode().toString()));
+        ops.writerAsync((MapWriterAsync<K, V>) mapOptions.getWriterAsync());
+        ops.writeBehindDelay(mapOptions.getWriteBehindDelay());
+        ops.writeBehindBatchSize(mapOptions.getWriteBehindBatchSize());
+        ops.loader((MapLoader<K, V>) mapOptions.getLoader());
+        ops.loaderAsync((MapLoaderAsync<K, V>) mapOptions.getLoaderAsync());
+        ops.codec(getCodec());
+        return ops;
+    }
+
+    public MapOptions<Object, Object> getOldMapOptions() {
         return mapOptions;
     }
 }

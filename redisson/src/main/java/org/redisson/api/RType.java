@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,21 @@ package org.redisson.api;
  */
 public enum RType {
 
-    OBJECT, MAP, LIST, SET, ZSET
-    
+    OBJECT("string"),
+    MAP("hash"),
+    LIST("list"),
+    SET("set"),
+    ZSET("zset"),
+    STREAM("stream"),
+    JSON("ReJSON-RL");
+
+    private final String value;
+
+    RType(String value) {
+        this.value = value;
+    }
+
+    public String getValue() {
+        return value;
+    }
 }

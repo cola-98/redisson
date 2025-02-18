@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,11 +15,12 @@
  */
 package org.redisson.remote;
 
+import io.netty.util.Timeout;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -32,20 +33,23 @@ public class ResponseEntry {
     public static class Result {
 
         private final CompletableFuture<? extends RRemoteServiceResponse> promise;
-        private final ScheduledFuture<?> responseTimeoutFuture;
+        private Timeout responseTimeoutFuture;
         
-        public Result(CompletableFuture<? extends RRemoteServiceResponse> promise, ScheduledFuture<?> responseTimeoutFuture) {
+        public Result(CompletableFuture<? extends RRemoteServiceResponse> promise) {
             super();
             this.promise = promise;
-            this.responseTimeoutFuture = responseTimeoutFuture;
         }
         
         public <T extends RRemoteServiceResponse> CompletableFuture<T> getPromise() {
             return (CompletableFuture<T>) promise;
         }
-        
-        public ScheduledFuture<?> getResponseTimeoutFuture() {
-            return responseTimeoutFuture;
+
+        public void setResponseTimeoutFuture(Timeout responseTimeoutFuture) {
+            this.responseTimeoutFuture = responseTimeoutFuture;
+        }
+
+        public void cancelResponseTimeout() {
+            responseTimeoutFuture.cancel();
         }
         
     }

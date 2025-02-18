@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,12 +16,15 @@
 package org.redisson.api;
 
 import org.redisson.api.mapreduce.RCollectionMapReduce;
+import org.redisson.client.protocol.RankedEntry;
 import org.redisson.client.protocol.ScoredEntry;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 /**
@@ -199,22 +202,44 @@ public interface RScoredSortedSet<V> extends RScoredSortedSetAsync<V>, Iterable<
     V takeLast();
 
     /**
-     * Subscribes on first elements appeared in this set.
-     * Continuously invokes {@link #takeFirstAsync()} method to get a new element.
+     * Use {@link #subscribeOnFirstElements(Function)} instead.
      *
      * @param consumer - queue elements listener
      * @return listenerId - id of listener
      */
+    @Deprecated
     int subscribeOnFirstElements(Consumer<V> consumer);
+
+    /**
+     * Use {@link #subscribeOnLastElements(Function)} instead.
+     *
+     * @param consumer - queue elements listener
+     * @return listenerId - id of listener
+     */
+    @Deprecated
+    int subscribeOnLastElements(Consumer<V> consumer);
+
+    /**
+     * Subscribes on first elements appeared in this set.
+     * Continuously invokes {@link #takeFirstAsync()} method to get a new element.
+     * <p>
+     * NOTE: don't call blocking methods in the elements listener
+     *
+     * @param consumer - queue elements listener
+     * @return listenerId - id of listener
+     */
+    int subscribeOnFirstElements(Function<V, CompletionStage<Void>> consumer);
 
     /**
      * Subscribes on last elements appeared in this set.
      * Continuously invokes {@link #takeLastAsync()} method to get a new element.
+     * <p>
+     * NOTE: don't call blocking methods in the elements listener
      *
      * @param consumer - queue elements listener
      * @return listenerId - id of listener
      */
-    int subscribeOnLastElements(Consumer<V> consumer);
+    int subscribeOnLastElements(Function<V, CompletionStage<Void>> consumer);
 
     /**
      * Un-subscribes defined listener.
@@ -243,6 +268,7 @@ public interface RScoredSortedSet<V> extends RScoredSortedSetAsync<V>, Iterable<
      * Requires <b>Redis 7.0.0 and higher.</b>
      *
      * @param duration how long to wait before giving up
+     * @param count entries amount
      * @return the head elements
      */
     List<V> pollFirst(Duration duration, int count);
@@ -295,11 +321,65 @@ public interface RScoredSortedSet<V> extends RScoredSortedSetAsync<V>, Iterable<
     V pollFirst();
 
     /**
+     * Removes and returns the head entry (value and its score) or {@code null} if this sorted set is empty.
+     *
+     * @return the head entry,
+     *         or {@code null} if this sorted set is empty
+     */
+    ScoredEntry<V> pollFirstEntry();
+
+    /**
+     * Removes and returns the head entries (value and its score) of this sorted set.
+     *
+     * @param count entries amount
+     * @return the head entries of this sorted set
+     */
+    List<ScoredEntry<V>> pollFirstEntries(int count);
+
+    /**
+     * Removes and returns the head entries (value and its score).
+     * <p>
+     * Requires <b>Redis 7.0.0 and higher.</b>
+     *
+     * @param duration how long to wait before giving up
+     * @param count entries amount
+     * @return the head entries
+     */
+    List<ScoredEntry<V>> pollFirstEntries(Duration duration, int count);
+
+
+    /**
      * Removes and returns the tail element or {@code null} if this sorted set is empty.
      *
      * @return the tail element or {@code null} if this sorted set is empty
      */
     V pollLast();
+
+    /**
+     * Removes and returns the tail entry (value and its score) or {@code null} if this sorted set is empty.
+     *
+     * @return the tail entry or {@code null} if this sorted set is empty
+     */
+    ScoredEntry<V> pollLastEntry();
+
+    /**
+     * Removes and returns the tail entries (value and its score) of this sorted set.
+     *
+     * @param count entries amount
+     * @return the tail entries of this sorted set
+     */
+    List<ScoredEntry<V>> pollLastEntries(int count);
+
+    /**
+     * Removes and returns the head entries (value and its score).
+     * <p>
+     * Requires <b>Redis 7.0.0 and higher.</b>
+     *
+     * @param duration how long to wait before giving up
+     * @param count entries amount
+     * @return the tail entries
+     */
+    List<ScoredEntry<V>> pollLastEntries(Duration duration, int count);
 
     /**
      * Returns the head element or {@code null} if this sorted set is empty.
@@ -309,11 +389,25 @@ public interface RScoredSortedSet<V> extends RScoredSortedSetAsync<V>, Iterable<
     V first();
 
     /**
+     * Returns the head entry (value and its score) or {@code null} if this sorted set is empty.
+     *
+     * @return the head entry or {@code null} if this sorted set is empty
+     */
+    ScoredEntry<V> firstEntry();
+
+    /**
      * Returns the tail element or {@code null} if this sorted set is empty.
      *
      * @return the tail element or {@code null} if this sorted set is empty
      */
     V last();
+
+    /**
+     * Returns the tail entry (value and its score) or {@code null} if this sorted set is empty.
+     *
+     * @return the tail entry or {@code null} if this sorted set is empty
+     */
+    ScoredEntry<V> lastEntry();
 
     /**
      * Returns score of the tail element or returns {@code null} if this sorted set is empty.
@@ -435,20 +529,38 @@ public interface RScoredSortedSet<V> extends RScoredSortedSetAsync<V>, Iterable<
     int removeRangeByRank(int startIndex, int endIndex);
 
     /**
-     * Returns rank of value, with the scores ordered from low to high.
+     * Returns rank of value, with the ranks ordered from low to high.
      * 
      * @param o - object
      * @return rank or <code>null</code> if value does not exist
      */
     Integer rank(V o);
-    
+
     /**
-     * Returns rank of value, with the scores ordered from high to low.
+     * Returns rank and score of specified <code>value</code>,
+     * with the ranks ordered from low to high.
+     *
+     * @param value object
+     * @return ranked entry or <code>null</code> if value does not exist
+     */
+    RankedEntry<V> rankEntry(V value);
+
+    /**
+     * Returns rank of value, with the ranks ordered from high to low.
      * 
      * @param o - object
      * @return rank or <code>null</code> if value does not exist
      */
     Integer revRank(V o);
+
+    /**
+     * Returns rank and score of specified <code>value</code>,
+     * with the ranks ordered from high to low.
+     *
+     * @param value object
+     * @return ranked entry or <code>null</code> if value does not exist
+     */
+    RankedEntry<V> revRankEntry(V value);
 
     /**
      * Returns ranks of elements, with the scores ordered from high to low.
@@ -652,6 +764,42 @@ public interface RScoredSortedSet<V> extends RScoredSortedSetAsync<V>, Iterable<
      * @return iterator
      */
     Iterator<V> iterator(String pattern, int count);
+
+    /**
+     * Returns an iterator over entries (value and its score) in this set.
+     *
+     * @return iterator
+     */
+    Iterator<ScoredEntry<V>> entryIterator();
+
+    /**
+     * Returns an iterator over entries (value and its score) in this set.
+     * If <code>pattern</code> is not null then only entries match this pattern are loaded.
+     *
+     * @param pattern search pattern
+     * @return iterator
+     */
+    Iterator<ScoredEntry<V>> entryIterator(String pattern);
+
+    /**
+     * Returns an iterator over entries (value and its score) in this set.
+     * Entries are loaded in batch. Batch size is defined by <code>count</code> param.
+     *
+     * @param count size of elements batch
+     * @return iterator
+     */
+    Iterator<ScoredEntry<V>> entryIterator(int count);
+
+    /**
+     * Returns an iterator over entries (value and its score) in this set.
+     * Entries are loaded in batch. Batch size is defined by <code>count</code> param.
+     * If pattern is not null then only entries match this pattern are loaded.
+     *
+     * @param pattern search pattern
+     * @param count size of entries batch
+     * @return iterator
+     */
+    Iterator<ScoredEntry<V>> entryIterator(String pattern, int count);
 
     /**
      * Returns element iterator that can be shared across multiple applications.
@@ -1285,5 +1433,20 @@ public interface RScoredSortedSet<V> extends RScoredSortedSetAsync<V>, Iterable<
      * @return length of diff
      */
     int diff(String... names);
+
+    /**
+     * Adds object event listener
+     *
+     * @see org.redisson.api.listener.TrackingListener
+     * @see org.redisson.api.listener.ScoredSortedSetAddListener
+     * @see org.redisson.api.listener.ScoredSortedSetRemoveListener
+     * @see org.redisson.api.ExpiredObjectListener
+     * @see org.redisson.api.DeletedObjectListener
+     *
+     * @param listener - object event listener
+     * @return listener id
+     */
+    @Override
+    int addListener(ObjectListener listener);
 
 }

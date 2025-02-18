@@ -1,43 +1,27 @@
 package org.redisson;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-
 import org.junit.jupiter.api.Test;
-import org.redisson.ClusterRunner.ClusterProcesses;
-import org.redisson.RedisRunner.FailedToStartRedisException;
 import org.redisson.api.NameMapper;
 import org.redisson.api.RBucket;
 import org.redisson.api.RBuckets;
 import org.redisson.api.RedissonClient;
 import org.redisson.client.codec.StringCodec;
 import org.redisson.config.Config;
-import org.redisson.connection.balancer.RandomLoadBalancer;
+import org.redisson.config.ReadMode;
 
-public class RedissonBucketsTest extends BaseTest {
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+public class RedissonBucketsTest extends RedisDockerTest {
 
     @Test
-    public void testGetInClusterNameMapper() throws FailedToStartRedisException, IOException, InterruptedException {
-        RedisRunner master1 = new RedisRunner().randomPort().randomDir().nosave();
-        RedisRunner master2 = new RedisRunner().randomPort().randomDir().nosave();
-        RedisRunner master3 = new RedisRunner().randomPort().randomDir().nosave();
-        RedisRunner slave1 = new RedisRunner().randomPort().randomDir().nosave();
-        RedisRunner slave2 = new RedisRunner().randomPort().randomDir().nosave();
-        RedisRunner slave3 = new RedisRunner().randomPort().randomDir().nosave();
-
-        ClusterRunner clusterRunner = new ClusterRunner()
-                .addNode(master1, slave1)
-                .addNode(master2, slave2)
-                .addNode(master3, slave3);
-        ClusterProcesses process = clusterRunner.run();
-
-        Config config = new Config();
-        config.useClusterServers()
+    public void testNameMapper() {
+        Config config = redisson.getConfig();
+        config.useSingleServer()
                 .setNameMapper(new NameMapper() {
                     @Override
                     public String map(String name) {
@@ -48,76 +32,92 @@ public class RedissonBucketsTest extends BaseTest {
                     public String unmap(String name) {
                         return name.replace("test::", "");
                     }
-                })
-                .setLoadBalancer(new RandomLoadBalancer())
-                .addNodeAddress(process.getNodes().stream().findAny().get().getRedisServerAddressAndPort());
+                });
+
         RedissonClient redisson = Redisson.create(config);
+        RBuckets buckets = redisson.getBuckets();
+        Map<String, String> kvMap = new HashMap<>();
+        kvMap.put("k1", "v1");
+        kvMap.put("k2", "v2");
+        buckets.set(kvMap);
 
-        int size = 10000;
-        Map<String, Integer> map = new HashMap<>();
-        for (int i = 0; i < 10; i++) {
-            map.put("test" + i, i);
-        }
-        for (int i = 10; i < size; i++) {
-            map.put("test" + i + "{" + (i%100)+ "}", i);
-        }
-
-        redisson.getBuckets().set(map);
-
-        Set<String> queryKeys = new HashSet<>(map.keySet());
-        queryKeys.add("test_invalid");
-        Map<String, Integer> buckets = redisson.getBuckets().get(queryKeys.toArray(new String[map.size()]));
-
-        assertThat(buckets).isEqualTo(map);
-
-        for (int i = 0; i < 10; i++) {
-            assertThat(redisson.getBucket("test" + i).get()).isEqualTo(i);
-        }
-
-        redisson.shutdown();
-        process.shutdown();
+        Map<String, Object> res = buckets.get("k1", "k2");
+        assertThat(res.get("k1")).isEqualTo("v1");
+        assertThat(res.get("k2")).isEqualTo("v2");
     }
 
     @Test
-    public void testGetInCluster() throws FailedToStartRedisException, IOException, InterruptedException {
-        RedisRunner master1 = new RedisRunner().randomPort().randomDir().nosave();
-        RedisRunner master2 = new RedisRunner().randomPort().randomDir().nosave();
-        RedisRunner master3 = new RedisRunner().randomPort().randomDir().nosave();
-        RedisRunner slave1 = new RedisRunner().randomPort().randomDir().nosave();
-        RedisRunner slave2 = new RedisRunner().randomPort().randomDir().nosave();
-        RedisRunner slave3 = new RedisRunner().randomPort().randomDir().nosave();
+    public void testGetInClusterNameMapper() {
+        testInCluster(client -> {
+            Config config = client.getConfig();
+            config.useClusterServers()
+                    .setReadMode(ReadMode.MASTER)
+                    .setNameMapper(new NameMapper() {
+                        @Override
+                        public String map(String name) {
+                            return "test::" + name;
+                        }
 
-        ClusterRunner clusterRunner = new ClusterRunner()
-                .addNode(master1, slave1)
-                .addNode(master2, slave2)
-                .addNode(master3, slave3);
-        ClusterProcesses process = clusterRunner.run();
-        
-        Config config = new Config();
-        config.useClusterServers()
-        .setLoadBalancer(new RandomLoadBalancer())
-        .addNodeAddress(process.getNodes().stream().findAny().get().getRedisServerAddressAndPort());
-        RedissonClient redisson = Redisson.create(config);
-        
-        int size = 10000;
-        Map<String, Integer> map = new HashMap<>();
-        for (int i = 0; i < 10; i++) {
-            map.put("test" + i, i);
-        }
-        for (int i = 10; i < size; i++) {
-            map.put("test" + i + "{" + (i%100)+ "}", i);
-        }
+                        @Override
+                        public String unmap(String name) {
+                            return name.replace("test::", "");
+                        }
+                    });
 
-        redisson.getBuckets().set(map);
-        
-        Set<String> queryKeys = new HashSet<>(map.keySet());
-        queryKeys.add("test_invalid");
-        Map<String, Integer> buckets = redisson.getBuckets().get(queryKeys.toArray(new String[map.size()]));
-        
-        assertThat(buckets).isEqualTo(map);
-        
-        redisson.shutdown();
-        process.shutdown();
+            RedissonClient redisson = Redisson.create(config);
+
+            int size = 10000;
+            Map<String, Integer> map = new HashMap<>();
+            for (int i = 0; i < 10; i++) {
+                map.put("test" + i, i);
+            }
+            for (int i = 10; i < size; i++) {
+                map.put("test" + i + "{" + (i % 100) + "}", i);
+            }
+
+            redisson.getBuckets().set(map);
+
+            Set<String> queryKeys = new HashSet<>(map.keySet());
+            queryKeys.add("test_invalid");
+            Map<String, Integer> buckets = redisson.getBuckets().get(queryKeys.toArray(new String[map.size()]));
+
+            assertThat(buckets).isEqualTo(map);
+
+            for (int i = 0; i < 10; i++) {
+                assertThat(redisson.getBucket("test" + i).get()).isEqualTo(i);
+            }
+
+            redisson.shutdown();
+        });
+    }
+
+    @Test
+    public void testGetInCluster() {
+        testInCluster(client -> {
+            Config config = client.getConfig();
+            config.useClusterServers()
+                    .setReadMode(ReadMode.MASTER);
+            RedissonClient redisson = Redisson.create(config);
+
+            int size = 10000;
+            Map<String, Integer> map = new HashMap<>();
+            for (int i = 0; i < 10; i++) {
+                map.put("test" + i, i);
+            }
+            for (int i = 10; i < size; i++) {
+                map.put("test" + i + "{" + (i%100)+ "}", i);
+            }
+
+            redisson.getBuckets().set(map);
+
+            Set<String> queryKeys = new HashSet<>(map.keySet());
+            queryKeys.add("test_invalid");
+            Map<String, Integer> buckets = redisson.getBuckets().get(queryKeys.toArray(new String[map.size()]));
+
+            assertThat(buckets).isEqualTo(map);
+
+            redisson.shutdown();
+        });
     }
     
     @Test

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +31,27 @@ public interface RObjectAsync {
      * @return number of seconds
      */
     RFuture<Long> getIdleTimeAsync();
+
+    /**
+     * Returns count of references over this object.
+     *
+     * @return count of reference
+     */
+    RFuture<Integer> getReferenceCountAsync();
+
+    /**
+     * Returns the logarithmic access frequency counter over this object.
+     *
+     * @return frequency counter
+     */
+    RFuture<Integer> getAccessFrequencyAsync();
+
+    /**
+     * Returns the internal encoding for the Redis object
+     *
+     * @return internal encoding
+     */
+    RFuture<ObjectEncoding> getInternalEncodingAsync();
 
     /**
      * Returns bytes amount used by object in Redis memory. 
@@ -112,7 +133,41 @@ public interface RObjectAsync {
      * @return void
      */
     RFuture<Void> copyAsync(String host, int port, int database, long timeout);
-    
+
+    /**
+     * Copy this object instance to the new instance with a defined name.
+     *
+     * @param destination name of the destination instance
+     * @return <code>true</code> if this object instance was copied else <code>false</code>
+     */
+    RFuture<Boolean> copyAsync(String destination);
+
+    /**
+     * Copy this object instance to the new instance with a defined name and database.
+     *
+     * @param destination name of the destination instance
+     * @param database database number
+     * @return <code>true</code> if this object instance was copied else <code>false</code>
+     */
+    RFuture<Boolean> copyAsync(String destination, int database);
+
+    /**
+     * Copy this object instance to the new instance with a defined name, and replace it if it already exists.
+     *
+     * @param destination name of the destination instance
+     * @return <code>true</code> if this object instance was copied else <code>false</code>
+     */
+    RFuture<Boolean> copyAndReplaceAsync(String destination);
+
+    /**
+     * Copy this object instance to the new instance with a defined name and database, and replace it if it already exists.
+     *
+     * @param destination name of the destination instance
+     * @param database database number
+     * @return <code>true</code> if this object instance was copied else <code>false</code>
+     */
+    RFuture<Boolean> copyAndReplaceAsync(String destination, int database);
+
     /**
      * Move object to another database in async mode
      *

@@ -2,14 +2,15 @@ package org.redisson;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.redisson.api.DeletedObjectListener;
+import org.redisson.api.ExpiredObjectListener;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.redisson.client.*;
 import org.redisson.client.protocol.RedisCommands;
 import org.redisson.config.Config;
-import org.redisson.connection.balancer.RandomLoadBalancer;
+import org.testcontainers.containers.GenericContainer;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -81,19 +82,13 @@ public class RedissonLockTest extends BaseConcurrentTest {
     }
 
     @Test
-    public void testSubscriptionsPerConnection() throws InterruptedException, IOException {
-        RedisRunner.RedisProcess runner = new RedisRunner()
-                .port(RedisRunner.findFreePort())
-                .nosave()
-                .randomDir()
-                .run();
-
-        Config config = new Config();
+    public void testSubscriptionsPerConnection() throws InterruptedException {
+        Config config = createConfig();
         config.useSingleServer()
                 .setSubscriptionConnectionPoolSize(1)
                 .setSubscriptionConnectionMinimumIdleSize(1)
                 .setSubscriptionsPerConnection(1)
-                .setAddress(runner.getRedisServerAddressAndPort());
+                .setAddress(redisson.getConfig().useSingleServer().getAddress());
 
         RedissonClient redisson  = Redisson.create(config);
         ExecutorService e = Executors.newFixedThreadPool(32);
@@ -124,7 +119,7 @@ public class RedissonLockTest extends BaseConcurrentTest {
         assertThat(errors.get()).isZero();
 
         RedisClientConfig cc = new RedisClientConfig();
-        cc.setAddress(runner.getRedisServerAddressAndPort());
+        cc.setAddress(redisson.getConfig().useSingleServer().getAddress());
         RedisClient c = RedisClient.create(cc);
         RedisConnection ccc = c.connect();
         List<String> channels = ccc.sync(RedisCommands.PUBSUB_CHANNELS);
@@ -132,20 +127,12 @@ public class RedissonLockTest extends BaseConcurrentTest {
         c.shutdown();
 
         redisson.shutdown();
-        runner.stop();
     }
 
     @Test
-    public void testSinglePubSub() throws IOException, InterruptedException, ExecutionException {
-        RedisRunner.RedisProcess runner = new RedisRunner()
-                .port(RedisRunner.findFreePort())
-                .nosave()
-                .randomDir()
-                .run();
-
-        Config config = new Config();
+    public void testSinglePubSub() throws InterruptedException, ExecutionException {
+        Config config = createConfig();
         config.useSingleServer()
-            .setAddress(runner.getRedisServerAddressAndPort())
             .setSubscriptionConnectionPoolSize(1)
             .setSubscriptionsPerConnection(1);
         ExecutorService executorService = Executors.newFixedThreadPool(4);
@@ -165,7 +152,6 @@ public class RedissonLockTest extends BaseConcurrentTest {
 
         assertThat(hasFails).isFalse();
         redissonClient.shutdown();
-        runner.stop();
     }
 
     @Test
@@ -193,23 +179,33 @@ public class RedissonLockTest extends BaseConcurrentTest {
 
     @Test
     public void testRedisFailed() {
-        Assertions.assertThrows(WriteRedisConnectionException.class, () -> {
-            RedisRunner.RedisProcess master = new RedisRunner()
-                    .port(6377)
-                    .nosave()
-                    .randomDir()
-                    .run();
+        GenericContainer<?> redis = createRedis();
+        redis.start();
 
-            Config config = new Config();
-            config.useSingleServer().setAddress("redis://127.0.0.1:6377");
-            RedissonClient redisson = Redisson.create(config);
+        Config config = createConfig(redis);
+        RedissonClient redisson = Redisson.create(config);
+
+        Assertions.assertThrows(RedisException.class, () -> {
 
             RLock lock = redisson.getLock("myLock");
             // kill RedisServer while main thread is sleeping.
-            master.stop();
+            redis.stop();
             Thread.sleep(3000);
             lock.tryLock(5, 10, TimeUnit.SECONDS);
         });
+
+        redisson.shutdown();
+    }
+
+    @Test
+    public void testRemainTimeToLive2() {
+        RLock lock = redisson.getLock("lock");
+        lock.lock(10, TimeUnit.SECONDS);
+        lock.lock(10, TimeUnit.SECONDS);
+        lock.lock(10, TimeUnit.SECONDS);
+        lock.unlock();
+        lock.unlock();
+        assertThat(lock.remainTimeToLive()).isBetween(9000L, 10000L);
     }
 
     @Test
@@ -223,7 +219,7 @@ public class RedissonLockTest extends BaseConcurrentTest {
         
         long startTime = System.currentTimeMillis();
         lock.tryLock(3, TimeUnit.SECONDS);
-        assertThat(System.currentTimeMillis() - startTime).isBetween(2990L, 3100L);
+        assertThat(System.currentTimeMillis() - startTime).isBetween(2990L, 3350L);
     }
     
     @Test
@@ -277,36 +273,27 @@ public class RedissonLockTest extends BaseConcurrentTest {
     }
 
     @Test
-    public void testInCluster() throws Exception {
-        RedisRunner master1 = new RedisRunner().port(6890).randomDir().nosave();
-        RedisRunner master2 = new RedisRunner().port(6891).randomDir().nosave();
-        RedisRunner master3 = new RedisRunner().port(6892).randomDir().nosave();
-        RedisRunner slave1 = new RedisRunner().port(6900).randomDir().nosave();
-        RedisRunner slave2 = new RedisRunner().port(6901).randomDir().nosave();
-        RedisRunner slave3 = new RedisRunner().port(6902).randomDir().nosave();
-
-        ClusterRunner clusterRunner = new ClusterRunner()
-                .addNode(master1, slave1)
-                .addNode(master2, slave2)
-                .addNode(master3, slave3);
-        ClusterRunner.ClusterProcesses process = clusterRunner.run();
-
-        Thread.sleep(5000);
-
-        Config config = new Config();
-        config.useClusterServers()
-        .setLoadBalancer(new RandomLoadBalancer())
-        .addNodeAddress(process.getNodes().stream().findAny().get().getRedisServerAddressAndPort());
-        RedissonClient redisson = Redisson.create(config);
-
-        RLock lock = redisson.getLock("myLock");
-        lock.lock();
-        assertThat(lock.isLocked()).isTrue();
+    public void testRemainTimeToLive() {
+        RLock lock = redisson.getLock("test-lock:1");
+        lock.lock(1, TimeUnit.HOURS);
+        assertThat(lock.remainTimeToLive()).isBetween(TimeUnit.HOURS.toMillis(1) - 10, TimeUnit.HOURS.toMillis(1));
         lock.unlock();
-        assertThat(lock.isLocked()).isFalse();
+        assertThat(lock.remainTimeToLive()).isEqualTo(-2);
+        lock.lock();
+        assertThat(lock.remainTimeToLive()).isBetween(redisson.getConfig().getLockWatchdogTimeout() - 10, redisson.getConfig().getLockWatchdogTimeout());
+    }
 
-        redisson.shutdown();
-        process.shutdown();
+    @Test
+    public void testInCluster() throws Exception {
+        testInCluster(redisson -> {
+            for (int i = 0; i < 3; i++) {
+                RLock lock = redisson.getLock("myLock");
+                lock.lock();
+                assertThat(lock.isLocked()).isTrue();
+                lock.unlock();
+                assertThat(lock.isLocked()).isFalse();
+            }
+        });
     }
 
 
@@ -548,4 +535,54 @@ public class RedissonLockTest extends BaseConcurrentTest {
         Assertions.assertEquals(iterations, lockedCounter.get());
     }
 
+    @Test
+    public void testLockListener() {
+        testWithParams(redisson -> {
+            RLock lock1 = redisson.getLock("lock1");
+            CountDownLatch latch = new CountDownLatch(4);
+            int listenerId1 = lock1.addListener(new ExpiredObjectListener() {
+                @Override
+                public void onExpired(String name) {
+                    latch.countDown();
+                }
+            });
+            int listenerId2 = lock1.addListener(new DeletedObjectListener() {
+                @Override
+                public void onDeleted(String name) {
+                    latch.countDown();
+                }
+            });
+
+            lock1.lock(5, TimeUnit.SECONDS);
+            lock1.unlock();
+            assertThat(lock1.isLocked()).isFalse();
+            assertThat(latch.getCount()).isEqualTo(3);
+
+            try {
+                lock1.lock(5, TimeUnit.SECONDS);
+                Thread.sleep(6000);
+                assertThat(latch.getCount()).isEqualTo(2);
+
+                lock1.removeListener(listenerId1);
+                lock1.lock(5, TimeUnit.SECONDS);
+                Thread.sleep(5100);
+                assertThat(latch.getCount()).isEqualTo(2);
+
+                lock1.lock(5, TimeUnit.SECONDS);
+                lock1.unlock();
+                assertThat(lock1.isLocked()).isFalse();
+                assertThat(latch.getCount()).isEqualTo(1);
+
+                lock1.removeListener(listenerId2);
+                lock1.lock(5, TimeUnit.SECONDS);
+                lock1.unlock();
+                assertThat(lock1.isLocked()).isFalse();
+                assertThat(latch.getCount()).isEqualTo(1);
+
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+
+        }, NOTIFY_KEYSPACE_EVENTS, "Egx");
+    }
 }

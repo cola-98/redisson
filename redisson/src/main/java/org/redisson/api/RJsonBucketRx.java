@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,16 +39,27 @@ public interface RJsonBucketRx<V> extends RBucketRx<V> {
      *
      * @param <T> the type of object
      */
-    <T> Maybe<T> get(JsonCodec<T> codec, String... paths);
+    <T> Maybe<T> get(JsonCodec codec, String... paths);
 
     /**
      * Sets Json object by JSONPath only if previous value is empty
+     *
+     * @param path JSON path
+     * @param value object
+     * @return {@code true} if successful, or {@code false} if
+     *         value was already set
+     */
+    Single<Boolean> setIfAbsent(String path, Object value);
+
+    /**
+     * Use {@link #setIfAbsent(String, Object)} instead
      *
      * @param path  JSON path
      * @param value object
      * @return {@code true} if successful, or {@code false} if
      * value was already set
      */
+    @Deprecated
     Single<Boolean> trySet(String path, Object value);
 
     /**
@@ -83,7 +94,7 @@ public interface RJsonBucketRx<V> extends RBucketRx<V> {
      * @param newValue value to set
      * @return previous value
      */
-    <T> Maybe<T> getAndSet(JsonCodec<T> codec, String path, Object newValue);
+    <T> Maybe<T> getAndSet(JsonCodec codec, String path, Object newValue);
 
     /**
      * Stores object into element by specified JSONPath.
@@ -185,7 +196,7 @@ public interface RJsonBucketRx<V> extends RBucketRx<V> {
      * @param end end index, exclusive
      * @return index in array
      */
-    Single<Long> arrayIndex(String path, Object value, Single<Long> start, Single<Long> end);
+    Single<Long> arrayIndex(String path, Object value, Long start, Long end);
 
     /**
      * Returns index of object in arrays specified by JSONPath
@@ -199,7 +210,7 @@ public interface RJsonBucketRx<V> extends RBucketRx<V> {
      * @param end end index, exclusive
      * @return list of index in arrays
      */
-    Single<List<Long>> arrayIndexMulti(String path, Object value, Single<Long> start, Single<Long> end);
+    Single<List<Long>> arrayIndexMulti(String path, Object value, Long start, Long end);
 
     /**
      * Inserts values into array specified by JSONPath.
@@ -210,7 +221,7 @@ public interface RJsonBucketRx<V> extends RBucketRx<V> {
      * @param values values to insert
      * @return size of array
      */
-    Single<Long> arrayInsert(String path, Single<Long> index, Object... values);
+    Single<Long> arrayInsert(String path, Long index, Object... values);
 
     /**
      * Inserts values into arrays specified by JSONPath.
@@ -222,7 +233,7 @@ public interface RJsonBucketRx<V> extends RBucketRx<V> {
      * @param values values to insert
      * @return list of arrays size
      */
-    Single<List<Long>> arrayInsertMulti(String path, Single<Long> index, Object... values);
+    Single<List<Long>> arrayInsertMulti(String path, Long index, Object... values);
 
     /**
      * Returns size of array specified by JSONPath.
@@ -250,7 +261,7 @@ public interface RJsonBucketRx<V> extends RBucketRx<V> {
      *
      * @param <T> the type of object
      */
-    <T> Maybe<T> arrayPollLast(JsonCodec<T> codec, String path);
+    <T> Maybe<T> arrayPollLast(JsonCodec codec, String path);
 
     /**
      * Polls last element of arrays specified by JSONPath.
@@ -262,7 +273,7 @@ public interface RJsonBucketRx<V> extends RBucketRx<V> {
      *
      * @param <T> the type of object
      */
-    <T> Single<List<T>> arrayPollLastMulti(JsonCodec<T> codec, String path);
+    <T> Single<List<T>> arrayPollLastMulti(JsonCodec codec, String path);
 
     /**
      * Polls first element of array specified by JSONPath.
@@ -273,7 +284,7 @@ public interface RJsonBucketRx<V> extends RBucketRx<V> {
      *
      * @param <T> the type of object
      */
-    <T> Maybe<T> arrayPollFirst(JsonCodec<T> codec, String path);
+    <T> Maybe<T> arrayPollFirst(JsonCodec codec, String path);
 
     /**
      * Polls first element of arrays specified by JSONPath.
@@ -285,7 +296,7 @@ public interface RJsonBucketRx<V> extends RBucketRx<V> {
      *
      * @param <T> the type of object
      */
-    <T> Single<List<T>> arrayPollFirstMulti(JsonCodec<T> codec, String path);
+    <T> Single<List<T>> arrayPollFirstMulti(JsonCodec codec, String path);
 
     /**
      * Pops element located at index of array specified by JSONPath.
@@ -297,7 +308,7 @@ public interface RJsonBucketRx<V> extends RBucketRx<V> {
      *
      * @param <T> the type of object
      */
-    <T> Maybe<T> arrayPop(JsonCodec<T> codec, String path, Single<Long> index);
+    <T> Maybe<T> arrayPop(JsonCodec codec, String path, Long index);
 
     /**
      * Pops elements located at index of arrays specified by JSONPath.
@@ -310,7 +321,7 @@ public interface RJsonBucketRx<V> extends RBucketRx<V> {
      *
      * @param <T> the type of object
      */
-    <T> Single<List<T>> arrayPopMulti(JsonCodec<T> codec, String path, Single<Long> index);
+    <T> Single<List<T>> arrayPopMulti(JsonCodec codec, String path, Long index);
 
     /**
      * Trims array specified by JSONPath in range
@@ -321,7 +332,7 @@ public interface RJsonBucketRx<V> extends RBucketRx<V> {
      * @param end end index, inclusive
      * @return length of array
      */
-    Single<Long> arrayTrim(String path, Single<Long> start, Single<Long> end);
+    Single<Long> arrayTrim(String path, Long start, Long end);
 
     /**
      * Trims arrays specified by JSONPath in range
@@ -333,7 +344,7 @@ public interface RJsonBucketRx<V> extends RBucketRx<V> {
      * @param end end index, inclusive
      * @return length of array
      */
-    Single<List<Long>> arrayTrimMulti(String path, Single<Long> start, Single<Long> end);
+    Single<List<Long>> arrayTrimMulti(String path, Long start, Long end);
 
     /**
      * Clears json container.
@@ -358,7 +369,7 @@ public interface RJsonBucketRx<V> extends RBucketRx<V> {
      * @param delta increment value
      * @return the updated value
      */
-    <T extends Number> Maybe<T> incrementAndGet(String path, Maybe<T> delta);
+    <T extends Number> Maybe<T> incrementAndGet(String path, T delta);
 
     /**
      * Increments the current values specified by JSONPath by <code>delta</code>.
@@ -368,7 +379,15 @@ public interface RJsonBucketRx<V> extends RBucketRx<V> {
      * @param delta increment value
      * @return list of updated value
      */
-    <T extends Number> Single<List<T>> incrementAndGetMulti(String path, Maybe<T> delta);
+    <T extends Number> Single<List<T>> incrementAndGetMulti(String path, T delta);
+
+    /**
+     * Merges object into element by the specified JSONPath.
+     *
+     * @param path JSON path
+     * @param value value to merge
+     */
+    Completable merge(String path, Object value);
 
     /**
      * Returns keys amount in JSON container

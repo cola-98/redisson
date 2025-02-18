@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,6 @@ package org.redisson.connection;
 
 import org.redisson.config.*;
 
-import java.util.UUID;
-
 /**
  * 
  * @author Nikita Koksharov
@@ -26,22 +24,25 @@ import java.util.UUID;
  */
 public class SingleConnectionManager extends MasterSlaveConnectionManager {
 
-    public SingleConnectionManager(SingleServerConfig cfg, Config config, UUID id) {
-        super(create(cfg), config, id);
+    SingleConnectionManager(SingleServerConfig cfg, Config configCopy) {
+        super(create(cfg), configCopy);
     }
 
     private static MasterSlaveServersConfig create(SingleServerConfig cfg) {
         MasterSlaveServersConfig newconfig = new MasterSlaveServersConfig();
         
         newconfig.setPingConnectionInterval(cfg.getPingConnectionInterval());
-        newconfig.setSslEnableEndpointIdentification(cfg.isSslEnableEndpointIdentification());
         newconfig.setSslProvider(cfg.getSslProvider());
+        newconfig.setSslKeystoreType(cfg.getSslKeystoreType());
         newconfig.setSslTruststore(cfg.getSslTruststore());
         newconfig.setSslTruststorePassword(cfg.getSslTruststorePassword());
         newconfig.setSslKeystore(cfg.getSslKeystore());
         newconfig.setSslKeystorePassword(cfg.getSslKeystorePassword());
         newconfig.setSslProtocols(cfg.getSslProtocols());
-        
+        newconfig.setSslCiphers(cfg.getSslCiphers());
+        newconfig.setSslKeyManagerFactory(cfg.getSslKeyManagerFactory());
+        newconfig.setSslTrustManagerFactory(cfg.getSslTrustManagerFactory());
+
         newconfig.setRetryAttempts(cfg.getRetryAttempts());
         newconfig.setRetryInterval(cfg.getRetryInterval());
         newconfig.setTimeout(cfg.getTimeout());
@@ -62,9 +63,17 @@ public class SingleConnectionManager extends MasterSlaveConnectionManager {
         newconfig.setReadMode(ReadMode.MASTER);
         newconfig.setSubscriptionMode(SubscriptionMode.MASTER);
         newconfig.setKeepAlive(cfg.isKeepAlive());
+        newconfig.setTcpKeepAliveCount(cfg.getTcpKeepAliveCount());
+        newconfig.setTcpKeepAliveIdle(cfg.getTcpKeepAliveIdle());
+        newconfig.setTcpKeepAliveInterval(cfg.getTcpKeepAliveInterval());
+        newconfig.setTcpUserTimeout(cfg.getTcpUserTimeout());
         newconfig.setTcpNoDelay(cfg.isTcpNoDelay());
         newconfig.setNameMapper(cfg.getNameMapper());
-        
+        newconfig.setCredentialsResolver(cfg.getCredentialsResolver());
+        newconfig.setCommandMapper(cfg.getCommandMapper());
+        newconfig.setSslVerificationMode(cfg.getSslVerificationMode());
+        newconfig.setSubscriptionTimeout(cfg.getSubscriptionTimeout());
+
         return newconfig;
     }
 

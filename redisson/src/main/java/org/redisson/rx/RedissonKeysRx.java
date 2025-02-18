@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,9 @@ import java.util.List;
 
 import org.reactivestreams.Publisher;
 import org.redisson.RedissonKeys;
+import org.redisson.api.RType;
+import org.redisson.api.options.KeysScanOptions;
+import org.redisson.api.options.KeysScanParams;
 import org.redisson.client.RedisClient;
 import org.redisson.connection.MasterSlaveEntry;
 
@@ -46,29 +49,34 @@ public class RedissonKeysRx {
         return getKeysByPattern(null);
     }
 
-    public Flowable<String> getKeys(int count) {
-        return getKeysByPattern(null, count);
-    }
-
-    public Flowable<String> getKeysByPattern(String pattern) {
-        return getKeysByPattern(pattern, 10);
-    }
-    
-    public Flowable<String> getKeysByPattern(String pattern, int count) {
-        List<Publisher<String>> publishers = new ArrayList<Publisher<String>>();
+    public Flowable<String> getKeys(KeysScanOptions options) {
+        KeysScanParams params = (KeysScanParams) options;
+        List<Publisher<String>> publishers = new ArrayList<>();
         for (MasterSlaveEntry entry : commandExecutor.getConnectionManager().getEntrySet()) {
-            publishers.add(createKeysIterator(entry, pattern, count));
+            publishers.add(createKeysIterator(entry, params.getPattern(), params.getChunkSize(), params.getType()));
         }
         return Flowable.merge(publishers);
     }
 
-    private Publisher<String> createKeysIterator(MasterSlaveEntry entry, String pattern, int count) {
+    public Flowable<String> getKeys(int count) {
+        return getKeys(KeysScanOptions.defaults().chunkSize(count));
+    }
+
+    public Flowable<String> getKeysByPattern(String pattern) {
+        return getKeys(KeysScanOptions.defaults().pattern(pattern));
+    }
+    
+    public Flowable<String> getKeysByPattern(String pattern, int count) {
+        return getKeys(KeysScanOptions.defaults().pattern(pattern).chunkSize(count));
+    }
+
+    private Publisher<String> createKeysIterator(MasterSlaveEntry entry, String pattern, int count, RType type) {
         ReplayProcessor<String> p = ReplayProcessor.create();
         return p.doOnRequest(new LongConsumer() {
 
             private RedisClient client;
             private List<String> firstValues;
-            private long nextIterPos;
+            private String nextIterPos = "0";
             
             private long currentIndex;
             
@@ -78,16 +86,16 @@ public class RedissonKeysRx {
                 nextValues();
             }
             
-            protected void nextValues() {
-                instance.scanIteratorAsync(client, entry, nextIterPos, pattern, count).whenComplete((res, e) -> {
+            private void nextValues() {
+                instance.scanIteratorAsync(client, entry, nextIterPos, pattern, count, type).whenComplete((res, e) -> {
                     if (e != null) {
                         p.onError(e);
                         return;
                     }
                     
                     client = res.getRedisClient();
-                    long prevIterPos = nextIterPos;
-                    if (nextIterPos == 0 && firstValues == null) {
+                    String prevIterPos = nextIterPos;
+                    if ("0".equals(nextIterPos) && firstValues == null) {
                         firstValues = (List<String>) (Object) res.getValues();
                     } else if (res.getValues().equals(firstValues)) {
                         p.onComplete();
@@ -96,8 +104,8 @@ public class RedissonKeysRx {
                     }
 
                     nextIterPos = res.getPos();
-                    if (prevIterPos == nextIterPos) {
-                        nextIterPos = -1;
+                    if (prevIterPos.equals(nextIterPos)) {
+                        nextIterPos = "-1";
                     }
                     for (Object val : res.getValues()) {
                         p.onNext((String) val);
@@ -107,7 +115,7 @@ public class RedissonKeysRx {
                             return;
                         }
                     }
-                    if (nextIterPos == -1) {
+                    if ("-1".equals(nextIterPos)) {
                         p.onComplete();
                         currentIndex = 0;
                     }

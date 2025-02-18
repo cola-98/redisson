@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,11 +26,15 @@ import io.netty.util.CharsetUtil;
  */
 public class ChannelName implements CharSequence {
 
+    public static final ChannelName TRACKING = new ChannelName("__redis__:invalidate");
+
     private final byte[] name;
+    private final String str;
 
     public ChannelName(byte[] name) {
         super();
         this.name = name;
+        this.str = new String(name, CharsetUtil.UTF_8);
     }
     
     public ChannelName(String name) {
@@ -39,7 +43,7 @@ public class ChannelName implements CharSequence {
 
     @Override
     public String toString() {
-        return new String(name, CharsetUtil.UTF_8);
+        return str;
     }
     
     public byte[] getName() {
@@ -81,6 +85,14 @@ public class ChannelName implements CharSequence {
     @Override
     public CharSequence subSequence(int start, int end) {
         return toString().subSequence(start, end);
+    }
+
+    public boolean isKeyspace() {
+        return str.startsWith("__keyspace") || str.startsWith("__keyevent");
+    }
+
+    public boolean isTracking() {
+        return str.equals(TRACKING.toString());
     }
 
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,12 @@
 package org.redisson.config;
 
 import org.redisson.api.NameMapper;
+import org.redisson.client.DefaultCredentialsResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.TrustManagerFactory;
 import java.net.URL;
 
 /**
@@ -28,8 +31,8 @@ import java.net.URL;
  * @param <T> config type
  */
 public class BaseConfig<T extends BaseConfig<T>> {
-    
-    private static final Logger log = LoggerFactory.getLogger("config");
+
+    protected static final Logger log = LoggerFactory.getLogger("config");
 
     /**
      * If pooled connection not used for a <code>timeout</code> time
@@ -54,6 +57,8 @@ public class BaseConfig<T extends BaseConfig<T>> {
      */
     private int timeout = 3000;
 
+    private int subscriptionTimeout = 7500;
+
     private int retryAttempts = 3;
 
     private int retryInterval = 1500;
@@ -65,6 +70,8 @@ public class BaseConfig<T extends BaseConfig<T>> {
 
     private String username;
 
+    private CredentialsResolver credentialsResolver = new DefaultCredentialsResolver();
+
     /**
      * Subscriptions per Redis connection limit
      */
@@ -75,8 +82,10 @@ public class BaseConfig<T extends BaseConfig<T>> {
      */
     private String clientName;
 
-    private boolean sslEnableEndpointIdentification = true;
-    
+    private SslVerificationMode sslVerificationMode = SslVerificationMode.STRICT;
+
+    private String sslKeystoreType;
+
     private SslProvider sslProvider = SslProvider.JDK;
     
     private URL sslTruststore;
@@ -89,14 +98,29 @@ public class BaseConfig<T extends BaseConfig<T>> {
 
     private String[] sslProtocols;
 
+    private String[] sslCiphers;
+
+    private TrustManagerFactory sslTrustManagerFactory;
+
+    private KeyManagerFactory sslKeyManagerFactory;
+
     private int pingConnectionInterval = 30000;
 
     private boolean keepAlive;
-    
+
+    private int tcpKeepAliveCount;
+
+    private int tcpKeepAliveIdle;
+
+    private int tcpKeepAliveInterval;
+
+    private int tcpUserTimeout;
+
     private boolean tcpNoDelay = true;
 
     private NameMapper nameMapper = NameMapper.direct();
 
+    private CommandMapper commandMapper = CommandMapper.direct();
     
     BaseConfig() {
     }
@@ -111,17 +135,28 @@ public class BaseConfig<T extends BaseConfig<T>> {
         setClientName(config.getClientName());
         setConnectTimeout(config.getConnectTimeout());
         setIdleConnectionTimeout(config.getIdleConnectionTimeout());
-        setSslEnableEndpointIdentification(config.isSslEnableEndpointIdentification());
         setSslProvider(config.getSslProvider());
         setSslTruststore(config.getSslTruststore());
         setSslTruststorePassword(config.getSslTruststorePassword());
+        setSslKeystoreType(config.getSslKeystoreType());
         setSslKeystore(config.getSslKeystore());
         setSslKeystorePassword(config.getSslKeystorePassword());
         setSslProtocols(config.getSslProtocols());
+        setSslCiphers(config.getSslCiphers());
+        setSslKeyManagerFactory(config.getSslKeyManagerFactory());
+        setSslTrustManagerFactory(config.getSslTrustManagerFactory());
         setPingConnectionInterval(config.getPingConnectionInterval());
         setKeepAlive(config.isKeepAlive());
+        setTcpKeepAliveCount(config.getTcpKeepAliveCount());
+        setTcpKeepAliveIdle(config.getTcpKeepAliveIdle());
+        setTcpKeepAliveInterval(config.getTcpKeepAliveInterval());
+        setTcpUserTimeout(config.getTcpUserTimeout());
         setTcpNoDelay(config.isTcpNoDelay());
         setNameMapper(config.getNameMapper());
+        setCredentialsResolver(config.getCredentialsResolver());
+        setCommandMapper(config.getCommandMapper());
+        setSslVerificationMode(config.getSslVerificationMode());
+        setSubscriptionTimeout(config.getSubscriptionTimeout());
     }
 
     /**
@@ -184,7 +219,7 @@ public class BaseConfig<T extends BaseConfig<T>> {
      * Default is <code>3</code> attempts
      *
      * @see #timeout
-     * @param retryAttempts - retry attempts
+     * @param retryAttempts retry attempts
      * @return config
      */
     public T setRetryAttempts(int retryAttempts) {
@@ -231,13 +266,30 @@ public class BaseConfig<T extends BaseConfig<T>> {
         return timeout;
     }
 
+    public int getSubscriptionTimeout() {
+        return subscriptionTimeout;
+    }
+
+    /**
+     * Defines subscription timeout applied per channel subscription.
+     * <p>
+     * Default is <code>7500</code> milliseconds.
+     *
+     * @param subscriptionTimeout timeout in milliseconds
+     * @return config
+     */
+    public T setSubscriptionTimeout(int subscriptionTimeout) {
+        this.subscriptionTimeout = subscriptionTimeout;
+        return (T) this;
+    }
+
     /**
      * Setup connection name during connection init
      * via CLIENT SETNAME command
      * <p>
      * Default is <code>null</code>
      *
-     * @param clientName - name of client
+     * @param clientName name of client
      * @return config
      */
     public T setClientName(String clientName) {
@@ -254,7 +306,7 @@ public class BaseConfig<T extends BaseConfig<T>> {
      * <p>
      * Default is <code>10000</code> milliseconds.
      * 
-     * @param connectTimeout - timeout in milliseconds
+     * @param connectTimeout timeout in milliseconds
      * @return config
      */
     public T setConnectTimeout(int connectTimeout) {
@@ -273,7 +325,7 @@ public class BaseConfig<T extends BaseConfig<T>> {
      * <p>
      * Default is <code>10000</code> milliseconds.
      *
-     * @param idleConnectionTimeout - timeout in milliseconds
+     * @param idleConnectionTimeout timeout in milliseconds
      * @return config
      */
     public T setIdleConnectionTimeout(int idleConnectionTimeout) {
@@ -285,20 +337,25 @@ public class BaseConfig<T extends BaseConfig<T>> {
         return idleConnectionTimeout;
     }
 
+    @Deprecated
     public boolean isSslEnableEndpointIdentification() {
-        return sslEnableEndpointIdentification;
+        return this.sslVerificationMode == SslVerificationMode.STRICT;
     }
 
     /**
-     * Enables SSL endpoint identification.
-     * <p>
-     * Default is <code>true</code>
+     * Use {@link #setSslVerificationMode(SslVerificationMode)} instead.
      * 
-     * @param sslEnableEndpointIdentification - boolean value
+     * @param sslEnableEndpointIdentification boolean value
      * @return config
      */
+    @Deprecated
     public T setSslEnableEndpointIdentification(boolean sslEnableEndpointIdentification) {
-        this.sslEnableEndpointIdentification = sslEnableEndpointIdentification;
+        log.warn("sslEnableEndpointIdentification setting is deprecated. Use sslVerificationMode setting instead.");
+        if (sslEnableEndpointIdentification) {
+            this.sslVerificationMode = SslVerificationMode.STRICT;
+        } else {
+            this.sslVerificationMode = SslVerificationMode.NONE;
+        }
         return (T) this;
     }
 
@@ -311,7 +368,7 @@ public class BaseConfig<T extends BaseConfig<T>> {
      * <p>
      * Default is <code>JDK</code>
      * 
-     * @param sslProvider - ssl provider 
+     * @param sslProvider ssl provider
      * @return config
      */
     public T setSslProvider(SslProvider sslProvider) {
@@ -328,7 +385,7 @@ public class BaseConfig<T extends BaseConfig<T>> {
      * <p>
      * Default is <code>null</code>
      *
-     * @param sslTruststore - path
+     * @param sslTruststore truststore path
      * @return config
      */
     public T setSslTruststore(URL sslTruststore) {
@@ -364,7 +421,7 @@ public class BaseConfig<T extends BaseConfig<T>> {
      * <p>
      * Default is <code>null</code>
      *
-     * @param sslKeystore - path to keystore
+     * @param sslKeystore path to keystore
      * @return config
      */
     public T setSslKeystore(URL sslKeystore) {
@@ -381,7 +438,7 @@ public class BaseConfig<T extends BaseConfig<T>> {
      * <p>
      * Default is <code>null</code>
      *
-     * @param sslKeystorePassword - password
+     * @param sslKeystorePassword password
      * @return config
      */
     public T setSslKeystorePassword(String sslKeystorePassword) {
@@ -399,7 +456,7 @@ public class BaseConfig<T extends BaseConfig<T>> {
      * <p>
      * Default is <code>null</code>
      *
-     * @param sslProtocols - protocols
+     * @param sslProtocols protocols
      * @return config
      */
     public T setSslProtocols(String[] sslProtocols) {
@@ -417,7 +474,7 @@ public class BaseConfig<T extends BaseConfig<T>> {
      * <p>
      * Default is <code>30000</code>
      * 
-     * @param pingConnectionInterval - time in milliseconds
+     * @param pingConnectionInterval time in milliseconds
      * @return config
      */
     public T setPingConnectionInterval(int pingConnectionInterval) {
@@ -434,11 +491,75 @@ public class BaseConfig<T extends BaseConfig<T>> {
      * <p>
      * Default is <code>false</code>
      * 
-     * @param keepAlive - boolean value
+     * @param keepAlive boolean value
      * @return config
      */
     public T setKeepAlive(boolean keepAlive) {
         this.keepAlive = keepAlive;
+        return (T) this;
+    }
+
+    public int getTcpKeepAliveCount() {
+        return tcpKeepAliveCount;
+    }
+
+    /**
+     * Defines the maximum number of keepalive probes
+     * TCP should send before dropping the connection.
+     *
+     * @param tcpKeepAliveCount maximum number of keepalive probes
+     * @return config
+     */
+    public T setTcpKeepAliveCount(int tcpKeepAliveCount) {
+        this.tcpKeepAliveCount = tcpKeepAliveCount;
+        return (T) this;
+    }
+
+    public int getTcpKeepAliveIdle() {
+        return tcpKeepAliveIdle;
+    }
+
+    /**
+     * Defines the time in seconds the connection needs to remain idle
+     * before TCP starts sending keepalive probes,
+     *
+     * @param tcpKeepAliveIdle time in seconds
+     * @return config
+     */
+    public T setTcpKeepAliveIdle(int tcpKeepAliveIdle) {
+        this.tcpKeepAliveIdle = tcpKeepAliveIdle;
+        return (T) this;
+    }
+
+    public int getTcpKeepAliveInterval() {
+        return tcpKeepAliveInterval;
+    }
+
+    /**
+     * Defines the time in seconds between individual keepalive probes.
+     *
+     * @param tcpKeepAliveInterval time in seconds
+     * @return config
+     */
+    public T setTcpKeepAliveInterval(int tcpKeepAliveInterval) {
+        this.tcpKeepAliveInterval = tcpKeepAliveInterval;
+        return (T) this;
+    }
+
+    public int getTcpUserTimeout() {
+        return tcpUserTimeout;
+    }
+
+    /**
+     * Defines the maximum amount of time in milliseconds that transmitted data may
+     * remain unacknowledged, or buffered data may remain untransmitted
+     * (due to zero window size) before TCP will forcibly close the connection.
+     *
+     * @param tcpUserTimeout time in milliseconds
+     * @return config
+     */
+    public T setTcpUserTimeout(int tcpUserTimeout) {
+        this.tcpUserTimeout = tcpUserTimeout;
         return (T) this;
     }
 
@@ -451,7 +572,7 @@ public class BaseConfig<T extends BaseConfig<T>> {
      * <p>
      * Default is <code>true</code>
      * 
-     * @param tcpNoDelay - boolean value
+     * @param tcpNoDelay boolean value
      * @return config
      */
     public T setTcpNoDelay(boolean tcpNoDelay) {
@@ -468,11 +589,130 @@ public class BaseConfig<T extends BaseConfig<T>> {
      * Defines Name mapper which maps Redisson object name.
      * Applied to all Redisson objects.
      *
-     * @param nameMapper - name mapper object
+     * @param nameMapper name mapper object
      * @return config
      */
     public T setNameMapper(NameMapper nameMapper) {
         this.nameMapper = nameMapper;
         return (T) this;
     }
+
+    public CredentialsResolver getCredentialsResolver() {
+        return credentialsResolver;
+    }
+
+    /**
+     * Defines Credentials resolver which is invoked during connection for Redis server authentication.
+     * It makes possible to specify dynamically changing Redis credentials.
+     *
+     * @param credentialsResolver Credentials resolver object
+     * @return config
+     */
+    public T setCredentialsResolver(CredentialsResolver credentialsResolver) {
+        this.credentialsResolver = credentialsResolver;
+        return (T) this;
+    }
+
+    public String getSslKeystoreType() {
+        return sslKeystoreType;
+    }
+
+    /**
+     * Defines SSL keystore type.
+     * <p>
+     * Default is <code>null</code>
+     *
+     * @param sslKeystoreType keystore type
+     * @return config
+     */
+    public T setSslKeystoreType(String sslKeystoreType) {
+        this.sslKeystoreType = sslKeystoreType;
+        return (T) this;
+    }
+
+    public String[] getSslCiphers() {
+        return sslCiphers;
+    }
+
+    /**
+     * Defines SSL ciphers.
+     * <p>
+     * Default is <code>null</code>
+     *
+     * @param sslCiphers ciphers
+     * @return config
+     */
+    public T setSslCiphers(String[] sslCiphers) {
+        this.sslCiphers = sslCiphers;
+        return (T) this;
+    }
+
+    public TrustManagerFactory getSslTrustManagerFactory() {
+        return sslTrustManagerFactory;
+    }
+
+    /**
+     * Defines SSL TrustManagerFactory.
+     * <p>
+     * Default is <code>null</code>
+     *
+     * @param trustManagerFactory trust manager value
+     * @return config
+     */
+    public T setSslTrustManagerFactory(TrustManagerFactory trustManagerFactory) {
+        this.sslTrustManagerFactory = trustManagerFactory;
+        return (T) this;
+    }
+
+    public KeyManagerFactory getSslKeyManagerFactory() {
+        return sslKeyManagerFactory;
+    }
+
+    /**
+     * Defines SSL KeyManagerFactory.
+     * <p>
+     * Default is <code>null</code>
+     *
+     * @param keyManagerFactory key manager value
+     * @return config
+     */
+    public BaseConfig<T> setSslKeyManagerFactory(KeyManagerFactory keyManagerFactory) {
+        this.sslKeyManagerFactory = keyManagerFactory;
+        return this;
+    }
+
+    public CommandMapper getCommandMapper() {
+        return commandMapper;
+    }
+
+    /**
+     * Defines Command mapper which maps Redis command name.
+     * Applied to all Redis commands.
+     *
+     * @param commandMapper Redis command name mapper object
+     * @return config
+     */
+    public T setCommandMapper(CommandMapper commandMapper) {
+        this.commandMapper = commandMapper;
+        return (T) this;
+    }
+
+    public SslVerificationMode getSslVerificationMode() {
+        return sslVerificationMode;
+    }
+
+    /**
+     * Defines SSL verification mode, which prevents man-in-the-middle attacks.
+     *
+     * <p>
+     * Default is <code>SslVerificationMode.STRICT</code>
+     *
+     * @param sslVerificationMode
+     * @return
+     */
+    public T setSslVerificationMode(SslVerificationMode sslVerificationMode) {
+        this.sslVerificationMode = sslVerificationMode;
+        return (T) this;
+    }
+
 }

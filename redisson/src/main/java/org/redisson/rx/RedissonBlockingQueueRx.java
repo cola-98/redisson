@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,9 @@
  */
 package org.redisson.rx;
 
-import org.redisson.api.RBlockingQueueAsync;
-import org.redisson.api.RListAsync;
-
 import io.reactivex.rxjava3.core.Flowable;
+import org.redisson.BaseRedissonList;
+import org.redisson.api.RBlockingQueueAsync;
 
 /**
  * 
@@ -31,7 +30,7 @@ public class RedissonBlockingQueueRx<V> extends RedissonListRx<V> {
     private final RBlockingQueueAsync<V> queue;
     
     public RedissonBlockingQueueRx(RBlockingQueueAsync<V> queue) {
-        super((RListAsync<V>) queue);
+        super((BaseRedissonList<V>) queue);
         this.queue = queue;
     }
 

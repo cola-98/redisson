@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import org.reactivestreams.Publisher;
+import org.redisson.client.RedisClient;
 import org.redisson.client.codec.ByteArrayCodec;
 import org.redisson.client.codec.StringCodec;
 import org.redisson.client.protocol.RedisCommands;
@@ -66,7 +67,7 @@ public class RedissonReactiveClusterKeyCommands extends RedissonReactiveKeyComma
 
     @Override
     public Mono<ByteBuffer> randomKey(RedisClusterNode node) {
-        MasterSlaveEntry entry = getEntry(node);
+        RedisClient entry = getEntry(node);
         Mono<byte[]> m = executorService.reactive(() -> {
             return executorService.readRandomAsync(entry, ByteArrayCodec.INSTANCE, RedisCommands.RANDOM_KEY);
         });

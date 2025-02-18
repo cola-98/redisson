@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package org.redisson.api.redisnode;
 import org.redisson.api.RFuture;
 import org.redisson.client.protocol.Time;
 
+import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -84,5 +85,49 @@ public interface RedisNodeAsync {
      * @return void
      */
     RFuture<Void> setConfigAsync(String parameter, String value);
+
+    /**
+     * Runs the Redis database saving process in background.
+     *
+     */
+    RFuture<Void> bgSaveAsync();
+
+    /**
+     * Save the Redis database in background.
+     * If AOF rewrite process is in progress then
+     * the background save is scheduled to run upon its completion.
+     *
+     */
+    RFuture<Void> scheduleBgSaveAsync();
+
+    /**
+     * Save the Redis database.
+     *
+     */
+    RFuture<Void> saveAsync();
+
+    /**
+     * Returns time of the last successful
+     * Redis database save operation.
+     *
+     * @return time
+     */
+    RFuture<Instant> getLastSaveTimeAsync();
+
+    /**
+     * Runs an Append Only File rewrite process.
+     * Starts only if there is no a background process doing persistence.
+     * <p>
+     * If fails no data gets lost
+     *
+     */
+    RFuture<Void> bgRewriteAOFAsync();
+
+    /**
+     * Returns keys amount stored in this Redis node.
+     *
+     * @return keys amount
+     */
+    RFuture<Long> sizeAsync();
 
 }

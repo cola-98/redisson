@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.Single;
 
 /**
- * RxJava2 interface for Publish Subscribe object. Messages are delivered to all message listeners across Redis cluster.
+ * RxJava3 interface for Publish Subscribe object. Messages are delivered to all message listeners across Redis cluster.
  *
  * @author Nikita Koksharov
  *

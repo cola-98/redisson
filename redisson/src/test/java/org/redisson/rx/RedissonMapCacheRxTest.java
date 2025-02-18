@@ -1,23 +1,20 @@
 package org.redisson.rx;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RMapCacheRx;
-import org.redisson.api.RMapReactive;
 import org.redisson.api.RMapRx;
-import org.redisson.codec.MsgPackJacksonCodec;
+import org.redisson.api.map.event.EntryEvent;
+import org.redisson.api.map.event.EntryExpiredListener;
+
+import java.io.Serializable;
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class RedissonMapCacheRxTest extends BaseRxTest {
 
@@ -175,6 +172,27 @@ public class RedissonMapCacheRxTest extends BaseRxTest {
     }
 
     @Test
+    public void testExpireListener() throws InterruptedException {
+        RMapCacheRx<String, String> cache = redisson.getMapCache("simple");
+        sync(cache.put("0", "8", 1, TimeUnit.SECONDS));
+
+        AtomicBoolean received = new AtomicBoolean();
+        cache.addListener(new EntryExpiredListener<String, String>() {
+            @Override
+            public void onExpired(EntryEvent<String, String> event) {
+                assertThat(event.getKey()).isEqualTo("0");
+                assertThat(event.getValue()).isEqualTo("8");
+                received.set(true);
+            }
+        }).blockingGet();
+
+        Awaitility.await().atMost(Duration.ofSeconds(7)).untilAsserted(() -> {
+            assertThat(received).isTrue();
+            assertThat(cache.size().blockingGet()).isZero();
+        });
+    }
+
+    @Test
     public void testExpire() throws InterruptedException {
         RMapCacheRx<String, String> cache = redisson.getMapCache("simple");
         sync(cache.put("0", "8", 1, TimeUnit.SECONDS));
@@ -243,7 +261,7 @@ public class RedissonMapCacheRxTest extends BaseRxTest {
 
     @Test
     public void testContainsValue() throws InterruptedException {
-        RMapCacheRx<SimpleKey, SimpleValue> map = redisson.getMapCache("simple31", new MsgPackJacksonCodec());
+        RMapCacheRx<SimpleKey, SimpleValue> map = redisson.getMapCache("simple31");
         Assertions.assertFalse(sync(map.containsValue(new SimpleValue("34"))));
         sync(map.put(new SimpleKey("33"), new SimpleValue("44"), 1, TimeUnit.SECONDS));
 
@@ -284,7 +302,7 @@ public class RedissonMapCacheRxTest extends BaseRxTest {
 
     @Test
     public void testScheduler() throws InterruptedException {
-        RMapCacheRx<SimpleKey, SimpleValue> map = redisson.getMapCache("simple", new MsgPackJacksonCodec());
+        RMapCacheRx<SimpleKey, SimpleValue> map = redisson.getMapCache("simple");
         Assertions.assertNull(sync(map.get(new SimpleKey("33"))));
 
         sync(map.put(new SimpleKey("33"), new SimpleValue("44"), 5, TimeUnit.SECONDS));
@@ -297,7 +315,7 @@ public class RedissonMapCacheRxTest extends BaseRxTest {
 
     @Test
     public void testPutGet() throws InterruptedException {
-        RMapCacheRx<SimpleKey, SimpleValue> map = redisson.getMapCache("simple01", new MsgPackJacksonCodec());
+        RMapCacheRx<SimpleKey, SimpleValue> map = redisson.getMapCache("simple01");
         Assertions.assertNull(sync(map.get(new SimpleKey("33"))));
 
         sync(map.put(new SimpleKey("33"), new SimpleValue("44"), 2, TimeUnit.SECONDS));

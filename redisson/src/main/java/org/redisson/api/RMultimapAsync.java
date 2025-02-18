@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -128,6 +128,19 @@ public interface RMultimapAsync<K, V> extends RExpirableAsync {
     RFuture<Collection<V>> replaceValuesAsync(K key, Iterable<? extends V> values);
 
     /**
+     * Stores a collection of values with the same key, replacing any existing
+     * values for that key. Is faster than {@link #replaceValuesAsync(Object, Iterable)}
+     * by not returning the values.
+     *
+     * <p>If {@code values} is empty, this is equivalent to
+     * {@link #removeAllAsync(Object)}.
+     *
+     * @param key - map key
+     * @param values - map values
+     */
+    RFuture<Void> fastReplaceValuesAsync(K key, Iterable<? extends V> values);
+
+    /**
      * Removes all values associated with the key {@code key}.
      *
      * <p>Once this method returns, {@code key} will not be mapped to any values.
@@ -158,6 +171,14 @@ public interface RMultimapAsync<K, V> extends RExpirableAsync {
      * @return the number of keys that were removed from the hash, not including specified but non existing keys
      */
     RFuture<Long> fastRemoveAsync(K... keys);
+
+    /**
+     * Removes <code>values</code> from map by one operation
+     *
+     * @param values map values
+     * @return the number of values that were removed from the map
+     */
+    RFuture<Long> fastRemoveValueAsync(V... values);
 
     /**
      * Read all keys at once

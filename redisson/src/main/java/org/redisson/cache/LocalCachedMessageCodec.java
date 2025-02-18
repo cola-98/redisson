@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -109,6 +109,13 @@ public class LocalCachedMessageCodec extends BaseCodec {
             return new LocalCachedMapEnable(requestId.toString(), hashes);
         }
 
+        if (type == 0x6) {
+            byte len = buf.readByte();
+            CharSequence requestId = buf.readCharSequence(len, CharsetUtil.US_ASCII);
+            long timeout = buf.readLong();
+            return new LocalCachedMapDisabledKey(requestId.toString(), timeout);
+        }
+
         throw new IllegalArgumentException("Can't parse packet");
     };
     
@@ -182,6 +189,17 @@ public class LocalCachedMessageCodec extends BaseCodec {
             for (int i = 0; i < li.getKeyHashes().length; i++) {
                 result.writeBytes(li.getKeyHashes()[i]);
             }
+            return result;
+        }
+
+        if (in instanceof LocalCachedMapDisabledKey) {
+            LocalCachedMapDisabledKey dk = (LocalCachedMapDisabledKey) in;
+            ByteBuf result = ByteBufAllocator.DEFAULT.buffer();
+            result.writeByte(0x6);
+
+            result.writeByte(dk.getRequestId().length());
+            result.writeCharSequence(dk.getRequestId(), CharsetUtil.UTF_8);
+            result.writeLong(dk.getTimeout());
             return result;
         }
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,9 @@
  */
 package org.redisson.api;
 
+import org.redisson.config.BaseConfig;
+
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -67,11 +70,13 @@ public final class BatchOptions {
     private ExecutionMode executionMode = ExecutionMode.IN_MEMORY;
     
     private long responseTimeout;
-    private int retryAttempts;
+    private int retryAttempts = -1;
     private long retryInterval;
 
     private long syncTimeout;
     private int syncSlaves;
+    private int syncLocals;
+    private boolean syncAOF;
     private boolean skipResult;
 
     private BatchOptions() {
@@ -89,8 +94,8 @@ public final class BatchOptions {
      * Defines timeout for Redis response. 
      * Starts to countdown when Redis command has been successfully sent.
      * <p>
-     * Default is <code>3000 milliseconds</code>
-     * 
+     * Default is <code>{@link BaseConfig#getTimeout()}</code>
+     *
      * @param timeout value
      * @param unit value
      * @return self instance
@@ -108,7 +113,7 @@ public final class BatchOptions {
      * Defines attempts amount to send Redis commands batch
      * if it hasn't been sent already.
      * <p>
-     * Default is <code>3 attempts</code>
+     * Default is <code>{@link BaseConfig#getRetryAttempts()}</code>
      * 
      * @param retryAttempts value
      * @return self instance
@@ -126,7 +131,7 @@ public final class BatchOptions {
      * Defines time interval for each attempt to send Redis commands batch 
      * if it hasn't been sent already.
      * <p>
-     * Default is <code>1500 milliseconds</code>
+     * Default is <code>{@link BaseConfig#getRetryInterval()}</code>
      * 
      * @param retryInterval time interval
      * @param retryIntervalUnit time interval unit
@@ -139,41 +144,78 @@ public final class BatchOptions {
 
     
     /**
-     * Synchronize write operations execution within defined timeout 
-     * across specified amount of Redis slave nodes.
-     * <p>
-     * NOTE: Redis 3.0+ required
-     * 
-     * @param slaves slaves amount for synchronization
-     * @param timeout synchronization timeout
-     * @param unit synchronization timeout time unit
-     * @return self instance
+     * Use {@link #sync(int, Duration)} instead
      */
+    @Deprecated
     public BatchOptions syncSlaves(int slaves, long timeout, TimeUnit unit) {
         this.syncSlaves = slaves;
         this.syncTimeout = unit.toMillis(timeout);
         return this;
     }
+
+    /**
+     * Synchronize write operations execution within defined timeout
+     * across specified amount of Redis slave nodes.
+     * <p>
+     * NOTE: Redis 3.0+ required
+     *
+     * @param slaves slaves amount for synchronization
+     * @param timeout synchronization timeout
+     * @return self instance
+     */
+    public BatchOptions sync(int slaves, Duration timeout) {
+        this.syncSlaves = slaves;
+        this.syncTimeout = timeout.toMillis();
+        return this;
+    }
+
     public long getSyncTimeout() {
         return syncTimeout;
     }
     public int getSyncSlaves() {
         return syncSlaves;
     }
-    
+
     /**
      * Inform Redis not to send reply. This allows to save network traffic for commands with batch with big response.
      * <p>
      * NOTE: Redis 3.2+ required
-     * 
+     *
      * @return self instance
      */
     public BatchOptions skipResult() {
         skipResult = true;
         return this;
     }
+
+    /**
+     * Synchronize write operations to the AOF within defined timeout
+     * across specified amount of Redis slave nodes and local Redis.
+     * <p>
+     * NOTE: Redis 7.2+ required
+     *
+     * @param localNum local Redis amount for synchronization
+     * @param slaves slaves amount for synchronization
+     * @param timeout synchronization timeout
+     * @return self instance
+     */
+    public BatchOptions syncAOF(int localNum, int slaves, Duration timeout) {
+        this.syncSlaves = slaves;
+        this.syncAOF = true;
+        this.syncLocals = localNum;
+        this.syncTimeout = timeout.toMillis();
+        return this;
+    }
     public boolean isSkipResult() {
         return skipResult;
+    }
+
+    public int getSyncLocals() {
+        return syncLocals;
+    }
+
+    public boolean isSyncAOF() {
+        return syncAOF;
     }
 
     /**

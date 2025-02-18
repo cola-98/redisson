@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,12 +15,12 @@
  */
 package org.redisson.hibernate.region;
 
-import java.util.Properties;
-
 import org.hibernate.cache.spi.QueryResultsRegion;
 import org.hibernate.cache.spi.RegionFactory;
 import org.redisson.api.RMapCache;
-import org.redisson.connection.ConnectionManager;
+import org.redisson.connection.ServiceManager;
+
+import java.util.Properties;
 
 /**
  * 
@@ -29,9 +29,9 @@ import org.redisson.connection.ConnectionManager;
  */
 public class RedissonQueryRegion extends BaseRegion implements QueryResultsRegion {
 
-    public RedissonQueryRegion(RMapCache<Object, Object> mapCache, ConnectionManager connectionManager,
+    public RedissonQueryRegion(RMapCache<Object, Object> mapCache, ServiceManager serviceManager,
             RegionFactory regionFactory, Properties properties, String defaultKey) {
-        super(mapCache, connectionManager, regionFactory, null, properties, defaultKey);
+        super(mapCache, serviceManager, regionFactory, null, properties, defaultKey);
     }
 
 }

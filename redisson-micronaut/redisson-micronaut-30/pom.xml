@@ -4,54 +4,26 @@
     <parent>
         <groupId>org.redisson</groupId>
         <artifactId>redisson-micronaut</artifactId>
-        <version>3.17.7-SNAPSHOT</version>
+        <version>3.44.1-SNAPSHOT</version>
         <relativePath>../</relativePath>
     </parent>
 
     <artifactId>redisson-micronaut-30</artifactId>
     <packaging>jar</packaging>
 
-    <name>Redisson/Micronaut v3.x.x integration</name>
+    <properties>
+        <micronaut.version>3.10.3</micronaut.version>
+        <main.basedir>${project.parent.parent.basedir}</main.basedir>
+    </properties>
+
+    <name>Redisson Micronaut v3.x.x integration</name>
 
     <build>
         <plugins>
-            <plugin>
-                <groupId>com.mycila</groupId>
-                <artifactId>license-maven-plugin</artifactId>
-                <version>3.0</version>
-                <configuration>
-                    <basedir>${basedir}</basedir>
-                    <header>${basedir}/../../header.txt</header>
-                    <quiet>false</quiet>
-                    <failIfMissing>true</failIfMissing>
-                    <aggregate>false</aggregate>
-                    <includes>
-                        <include>src/main/java/org/redisson/</include>
-                    </includes>
-                    <excludes>
-                        <exclude>target/**</exclude>
-                    </excludes>
-                    <useDefaultExcludes>true</useDefaultExcludes>
-                    <mapping>
-                        <java>JAVADOC_STYLE</java>
-                    </mapping>
-                    <strictCheck>true</strictCheck>
-                    <useDefaultMapping>true</useDefaultMapping>
-                    <encoding>UTF-8</encoding>
-                </configuration>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>check</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.8.1</version>
+          <version>3.13.0</version>
           <configuration>
             <compilerArgs>
               <arg>-parameters</arg>
@@ -60,12 +32,12 @@
                   <path>
                     <groupId>io.micronaut</groupId>
                     <artifactId>micronaut-inject-java</artifactId>
-                    <version>3.4.1</version>
+                    <version>${micronaut.version}</version>
                   </path>
                   <path>
                     <groupId>io.micronaut</groupId>
                     <artifactId>micronaut-validation</artifactId>
-                    <version>3.4.1</version>
+                    <version>${micronaut.version}</version>
                   </path>
             </annotationProcessorPaths>
           </configuration>
@@ -83,12 +55,12 @@
                   <path>
                     <groupId>io.micronaut</groupId>
                     <artifactId>micronaut-inject-java</artifactId>
-                    <version>3.4.1</version>
+                    <version>${micronaut.version}</version>
                   </path>
                   <path>
                     <groupId>io.micronaut</groupId>
                     <artifactId>micronaut-validation</artifactId>
-                    <version>3.4.1</version>
+                    <version>${micronaut.version}</version>
                   </path>
                 </annotationProcessorPaths>
               </configuration>
@@ -103,7 +75,7 @@
         <dependency>
             <groupId>io.micronaut</groupId>
             <artifactId>micronaut-inject</artifactId>
-            <version>3.6.3</version>
+            <version>${micronaut.version}</version>
             <optional>true</optional>
         </dependency>
 
@@ -117,21 +89,21 @@
         <dependency>
             <groupId>io.micronaut</groupId>
             <artifactId>micronaut-session</artifactId>
-            <version>3.6.3</version>
+            <version>${micronaut.version}</version>
             <optional>true</optional>
         </dependency>
 
         <dependency>
             <groupId>io.micronaut</groupId>
             <artifactId>micronaut-management</artifactId>
-            <version>3.6.3</version>
+            <version>${micronaut.version}</version>
             <optional>true</optional>
         </dependency>
 
         <dependency>
             <groupId>io.micronaut</groupId>
             <artifactId>micronaut-inject-java</artifactId>
-            <version>3.6.3</version>
+            <version>${micronaut.version}</version>
             <scope>test</scope>
         </dependency>
 
@@ -160,7 +132,7 @@
         <dependency>
           <groupId>io.micronaut.test</groupId>
           <artifactId>micronaut-test-junit5</artifactId>
-          <version>3.1.1</version>
+          <version>3.9.2</version>
           <scope>test</scope>
         </dependency>
         <dependency>

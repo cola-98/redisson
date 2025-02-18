@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,11 +46,11 @@ public class RedissonBinaryStreamRx {
     }
 
     public Single<Integer> read(ByteBuffer buf) {
-        return commandExecutor.flowable(() -> ((RFuture<Integer>) channel.read(buf)).toCompletableFuture()).singleOrError();
+        return commandExecutor.flowable(() -> ((RFuture<Integer>) channel.read(buf))).singleOrError();
     }
 
     public Single<Integer> write(ByteBuffer buf) {
-        return commandExecutor.flowable(() -> ((RFuture<Integer>) channel.write(buf)).toCompletableFuture()).singleOrError();
+        return commandExecutor.flowable(() -> ((RFuture<Integer>) channel.write(buf))).singleOrError();
     }
 
 }

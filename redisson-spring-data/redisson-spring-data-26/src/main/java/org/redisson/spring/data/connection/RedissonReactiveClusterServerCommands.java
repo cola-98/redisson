@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package org.redisson.spring.data.connection;
 import java.util.List;
 import java.util.Properties;
 
+import org.redisson.client.RedisClient;
 import org.redisson.client.codec.StringCodec;
 import org.redisson.client.protocol.RedisCommands;
 import org.redisson.client.protocol.RedisStrictCommand;
@@ -126,7 +127,7 @@ public class RedissonReactiveClusterServerCommands extends RedissonReactiveServe
     
     @Override
     public Flux<RedisClientInfo> getClientList(RedisClusterNode node) {
-        MasterSlaveEntry entry = getEntry(node);
+        RedisClient entry = getEntry(node);
         Mono<List<String>> m = executorService.reactive(() -> {
             return executorService.readAsync(entry, StringCodec.INSTANCE, RedisCommands.CLIENT_LIST);
         });

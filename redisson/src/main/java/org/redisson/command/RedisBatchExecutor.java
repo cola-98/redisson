@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@ import org.redisson.client.codec.Codec;
 import org.redisson.client.protocol.RedisCommand;
 import org.redisson.command.CommandBatchService.Entry;
 import org.redisson.connection.ConnectionManager;
-import org.redisson.connection.MasterSlaveEntry;
 import org.redisson.connection.NodeSource;
 import org.redisson.liveobject.core.RedissonObjectBuilder;
 
@@ -41,7 +40,7 @@ public class RedisBatchExecutor<V, R> extends BaseRedisBatchExecutor<V, R> {
     @SuppressWarnings("ParameterNumber")
     public RedisBatchExecutor(boolean readOnlyMode, NodeSource source, Codec codec, RedisCommand<V> command,
                               Object[] params, CompletableFuture<R> mainPromise, boolean ignoreRedirect, ConnectionManager connectionManager,
-                              RedissonObjectBuilder objectBuilder, ConcurrentMap<MasterSlaveEntry, Entry> commands,
+                              RedissonObjectBuilder objectBuilder, ConcurrentMap<NodeSource, Entry> commands,
                               BatchOptions options, AtomicInteger index,
                               AtomicBoolean executed, RedissonObjectBuilder.ReferenceType referenceType, boolean noRetry) {
         super(readOnlyMode, source, codec, command, params, mainPromise, ignoreRedirect, connectionManager, objectBuilder,
@@ -50,7 +49,13 @@ public class RedisBatchExecutor<V, R> extends BaseRedisBatchExecutor<V, R> {
     
     @Override
     public void execute() {
-        addBatchCommandData(params);
+        try {
+            addBatchCommandData(params);
+        } catch (Exception e) {
+            free();
+            handleError(connectionFuture, e);
+            throw e;
+        }
     }
     
 }

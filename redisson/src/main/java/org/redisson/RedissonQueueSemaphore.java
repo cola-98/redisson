@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,9 @@
  */
 package org.redisson;
 
+import io.netty.util.ReferenceCountUtil;
 import org.redisson.api.RFuture;
+import org.redisson.client.codec.Codec;
 import org.redisson.client.protocol.RedisCommands;
 import org.redisson.command.CommandAsyncExecutor;
 
@@ -34,9 +36,12 @@ public class RedissonQueueSemaphore extends RedissonSemaphore {
     private String queueName;
     private Object value;
     private Collection<?> values;
+    private Codec codec;
     
-    public RedissonQueueSemaphore(CommandAsyncExecutor commandExecutor, String name) {
+    public RedissonQueueSemaphore(CommandAsyncExecutor commandExecutor, String name, Codec codec) {
         super(commandExecutor, name);
+        this.codec = codec;
+        this.name = name;
     }
     
     public void setQueueName(String queueName) {
@@ -54,15 +59,15 @@ public class RedissonQueueSemaphore extends RedissonSemaphore {
     public RFuture<Boolean> tryAcquireAsync(int permits) {
         List<Object> params;
         if (values != null) {
-            params = new ArrayList<Object>(values.size() + 1);
+            params = new ArrayList<>(values.size() + 1);
             params.add(values.size());
             for (Object value : values) {
-                params.add(encode(value));
+                encode(params, value);
             }
         } else {
-            params = new ArrayList<Object>(2);
+            params = new ArrayList<>(2);
             params.add(1);
-            params.add(encode(value));
+            encode(params, value);
         }
         return commandExecutor.evalWriteNoRetryAsync(getRawName(), codec, RedisCommands.EVAL_BOOLEAN,
                 "local value = redis.call('get', KEYS[1]); " +
@@ -76,5 +81,16 @@ public class RedissonQueueSemaphore extends RedissonSemaphore {
                     Arrays.<Object>asList(getRawName(), queueName), params.toArray());
     }
 
-    
+    public void encode(Collection<?> params, Object value) {
+        try {
+            Object v = commandExecutor.encode(codec, value);
+            ((Collection<Object>) params).add(v);
+        } catch (Exception e) {
+            params.forEach(v -> {
+                ReferenceCountUtil.safeRelease(v);
+            });
+            throw e;
+        }
+    }
+
 }

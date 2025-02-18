@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -181,6 +181,19 @@ public interface RMultimap<K, V> extends RExpirable, RMultimapAsync<K, V> {
     Collection<V> replaceValues(K key, Iterable<? extends V> values);
 
     /**
+     * Stores a collection of values with the same key, replacing any existing
+     * values for that key. Is faster than {@link #replaceValues} by not returning
+     * the values.
+     *
+     * <p>If {@code values} is empty, this is equivalent to
+     * {@link #removeAll(Object) removeAll(key)}.
+     *
+     * @param key - map key
+     * @param values - map values
+     */
+    void fastReplaceValues(K key, Iterable<? extends V> values);
+
+    /**
      * Removes all values associated with the key {@code key}.
      *
      * <p>Once this method returns, {@code key} will not be mapped to any values
@@ -275,6 +288,14 @@ public interface RMultimap<K, V> extends RExpirable, RMultimapAsync<K, V> {
      * @return the number of keys that were removed from the hash, not including specified but non existing keys
      */
     long fastRemove(K... keys);
+
+    /**
+     * Removes <code>values</code> from map by one operation
+     *
+     * @param values map values
+     * @return the number of values that were removed from the map
+     */
+    long fastRemoveValue(V... values);
 
     /**
      * Read all keys at once

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,8 +29,12 @@ public class StreamConsumerInfoDecoder implements MultiDecoder<StreamConsumer> {
 
     @Override
     public StreamConsumer decode(List<Object> parts, State state) {
-        return new StreamConsumer((String) parts.get(1), 
-                ((Long) parts.get(3)).intValue(), (Long) parts.get(5));
+        if (parts.size() > 6) {
+            return new StreamConsumer((String) parts.get(1),
+                    ((Long) parts.get(3)).intValue(), (Long) parts.get(5), (Long) parts.get(7));
+        }
+        return new StreamConsumer((String) parts.get(1),
+                ((Long) parts.get(3)).intValue(), (Long) parts.get(5), -1);
     }
 
 }

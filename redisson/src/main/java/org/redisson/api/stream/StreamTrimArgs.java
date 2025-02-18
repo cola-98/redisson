@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,8 +33,7 @@ public interface StreamTrimArgs {
      * @return arguments object
      */
     static StreamTrimLimitArgs<StreamTrimArgs> maxLen(int threshold) {
-        BaseStreamTrimArgs<StreamTrimArgs> args = new BaseStreamTrimArgs(new StreamTrimParams());
-        return args.maxLen(threshold);
+        return new StreamTrimParams(threshold);
     }
 
     /**
@@ -45,8 +44,7 @@ public interface StreamTrimArgs {
      * @return arguments object
      */
     static StreamTrimLimitArgs<StreamTrimArgs> minId(StreamMessageId messageId) {
-        BaseStreamTrimArgs<StreamTrimArgs> args = new BaseStreamTrimArgs(new StreamTrimParams());
-        return args.minId(messageId);
+        return new StreamTrimParams(messageId);
     }
 
 }

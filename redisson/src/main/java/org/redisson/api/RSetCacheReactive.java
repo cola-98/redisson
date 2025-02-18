@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
  */
 package org.redisson.api;
 
+import java.time.Duration;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -97,5 +99,146 @@ public interface RSetCacheReactive<V> extends RCollectionReactive<V>, RDestroyab
      * @return values
      */
     Mono<Set<V>> readAll();
-    
+
+    /**
+     * Tries to add elements only if none of them in set.
+     *
+     * @param values - values to add
+     * @return <code>true</code> if elements successfully added,
+     *          otherwise <code>false</code>.
+     */
+    Mono<Boolean> tryAdd(V... values);
+
+    /**
+     * Use {@link #addIfAbsent(Map)} instead
+     *
+     * Tries to add elements only if none of them in set.
+     *
+     * @param values - values to add
+     * @param ttl - time to live for value.
+     *              If <code>0</code> then stores infinitely.
+     * @param unit - time unit
+     * @return <code>true</code> if elements successfully added,
+     *          otherwise <code>false</code>.
+     */
+    @Deprecated
+    Mono<Boolean> tryAdd(long ttl, TimeUnit unit, V... values);
+
+    /**
+     * Adds element to this set only if has not been added before.
+     * <p>
+     * Requires <b>Redis 3.0.2 and higher.</b>
+     *
+     * @param ttl - object ttl
+     * @param object - object itself
+     * @return <code>true</code> if element added and <code>false</code> if not.
+     */
+    Mono<Boolean> addIfAbsent(Duration ttl, V object);
+
+    /**
+     * Adds elements to this set only if all of them haven't been added before.
+     * <p>
+     * Requires <b>Redis 3.0.2 and higher.</b>
+     *
+     * @param objects map of elements to add
+     * @return <code>true</code> if elements added and <code>false</code> if not.
+     */
+    Mono<Boolean> addIfAbsent(Map<V, Duration> objects);
+
+    /**
+     * Adds element to this set only if it's already exists.
+     * <p>
+     * Requires <b>Redis 3.0.2 and higher.</b>
+     *
+     * @param ttl - object ttl
+     * @param object - object itself
+     * @return <code>true</code> if element added and <code>false</code> if not.
+     */
+    Mono<Boolean> addIfExists(Duration ttl, V object);
+
+    /**
+     * Adds element to this set only if new ttl less than current ttl of existed element.
+     * <p>
+     * Requires <b>Redis 6.2.0 and higher.</b>
+     *
+     * @param ttl - object ttl
+     * @param object - object itself
+     * @return <code>true</code> if element added and <code>false</code> if not.
+     */
+    Mono<Boolean> addIfLess(Duration ttl, V object);
+
+    /**
+     * Adds element to this set only if new ttl greater than current ttl of existed element.
+     * <p>
+     * Requires <b>Redis 6.2.0 and higher.</b>
+     *
+     * @param ttl - object ttl
+     * @param object - object itself
+     * @return <code>true</code> if element added and <code>false</code> if not.
+     */
+    Mono<Boolean> addIfGreater(Duration ttl, V object);
+
+    /**
+     * Adds all elements contained in the specified map to this sorted set.
+     * Map contains of ttl mapped by object.
+     *
+     * @param objects - map of elements to add
+     * @return amount of added elements, not including already existing in this sorted set
+     */
+    Mono<Integer> addAll(Map<V, Duration> objects);
+
+    /**
+     * Adds elements to this set only if they haven't been added before.
+     * <p>
+     * Requires <b>Redis 3.0.2 and higher.</b>
+     *
+     * @param objects map of elements to add
+     * @return amount of added elements
+     */
+    Mono<Integer> addAllIfAbsent(Map<V, Duration> objects);
+
+    /**
+     * Adds elements to this set only if they already exist.
+     * <p>
+     * Requires <b>Redis 3.0.2 and higher.</b>
+     *
+     * @param objects map of elements to add
+     * @return amount of added elements
+     */
+    Mono<Integer> addAllIfExist(Map<V, Duration> objects);
+
+    /**
+     * Adds elements to this set only if new ttl greater than current ttl of existed elements.
+     * <p>
+     * Requires <b>Redis 6.2.0 and higher.</b>
+     *
+     * @param objects map of elements to add
+     * @return amount of added elements
+     */
+    Mono<Integer> addAllIfGreater(Map<V, Duration> objects);
+
+    /**
+     * Adds elements to this set only if new ttl less than current ttl of existed elements.
+     * <p>
+     * Requires <b>Redis 6.2.0 and higher.</b>
+     *
+     * @param objects map of elements to add
+     * @return amount of added elements
+     */
+    Mono<Integer> addAllIfLess(Map<V, Duration> objects);
+
+    /**
+     * Adds object event listener
+     *
+     * @see org.redisson.api.listener.TrackingListener
+     * @see org.redisson.api.listener.SetAddListener
+     * @see org.redisson.api.listener.SetRemoveListener
+     * @see org.redisson.api.ExpiredObjectListener
+     * @see org.redisson.api.DeletedObjectListener
+     *
+     * @param listener - object event listener
+     * @return listener id
+     */
+    Mono<Integer> addListener(ObjectListener listener);
+
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ public interface RJsonBucketAsync<V> extends RBucketAsync<V> {
      *
      * @param <T> the type of object
      */
-    <T> RFuture<T> getAsync(JsonCodec<T> codec, String... paths);
+    <T> RFuture<T> getAsync(JsonCodec codec, String... paths);
 
     /**
      * Sets Json object by JSONPath only if previous value is empty
@@ -91,7 +91,7 @@ public interface RJsonBucketAsync<V> extends RBucketAsync<V> {
      * @param newValue value to set
      * @return previous value
      */
-    <T> RFuture<T> getAndSetAsync(JsonCodec<T> codec, String path, Object newValue);
+    <T> RFuture<T> getAndSetAsync(JsonCodec codec, String path, Object newValue);
 
     /**
      * Stores object into element by specified JSONPath.
@@ -258,7 +258,7 @@ public interface RJsonBucketAsync<V> extends RBucketAsync<V> {
      *
      * @param <T> the type of object
      */
-    <T> RFuture<T> arrayPollLastAsync(JsonCodec<T> codec, String path);
+    <T> RFuture<T> arrayPollLastAsync(JsonCodec codec, String path);
 
     /**
      * Polls last element of arrays specified by JSONPath.
@@ -270,7 +270,7 @@ public interface RJsonBucketAsync<V> extends RBucketAsync<V> {
      *
      * @param <T> the type of object
      */
-    <T> RFuture<List<T>> arrayPollLastMultiAsync(JsonCodec<T> codec, String path);
+    <T> RFuture<List<T>> arrayPollLastMultiAsync(JsonCodec codec, String path);
 
     /**
      * Polls first element of array specified by JSONPath.
@@ -281,7 +281,7 @@ public interface RJsonBucketAsync<V> extends RBucketAsync<V> {
      *
      * @param <T> the type of object
      */
-    <T> RFuture<T> arrayPollFirstAsync(JsonCodec<T> codec, String path);
+    <T> RFuture<T> arrayPollFirstAsync(JsonCodec codec, String path);
 
     /**
      * Polls first element of arrays specified by JSONPath.
@@ -293,7 +293,7 @@ public interface RJsonBucketAsync<V> extends RBucketAsync<V> {
      *
      * @param <T> the type of object
      */
-    <T> RFuture<List<T>> arrayPollFirstMultiAsync(JsonCodec<T> codec, String path);
+    <T> RFuture<List<T>> arrayPollFirstMultiAsync(JsonCodec codec, String path);
 
     /**
      * Pops element located at index of array specified by JSONPath.
@@ -305,7 +305,7 @@ public interface RJsonBucketAsync<V> extends RBucketAsync<V> {
      *
      * @param <T> the type of object
      */
-    <T> RFuture<T> arrayPopAsync(JsonCodec<T> codec, String path, long index);
+    <T> RFuture<T> arrayPopAsync(JsonCodec codec, String path, long index);
 
     /**
      * Pops elements located at index of arrays specified by JSONPath.
@@ -318,7 +318,7 @@ public interface RJsonBucketAsync<V> extends RBucketAsync<V> {
      *
      * @param <T> the type of object
      */
-    <T> RFuture<List<T>> arrayPopMultiAsync(JsonCodec<T> codec, String path, long index);
+    <T> RFuture<List<T>> arrayPopMultiAsync(JsonCodec codec, String path, long index);
 
     /**
      * Trims array specified by JSONPath in range
@@ -377,6 +377,14 @@ public interface RJsonBucketAsync<V> extends RBucketAsync<V> {
      * @return list of updated value
      */
     <T extends Number> RFuture<List<T>> incrementAndGetMultiAsync(String path, T delta);
+
+    /**
+     * Merges object into element by the specified JSONPath.
+     *
+     * @param path JSON path
+     * @param value value to merge
+     */
+    RFuture<Void> mergeAsync(String path, Object value);
 
     /**
      * Returns keys amount in JSON container

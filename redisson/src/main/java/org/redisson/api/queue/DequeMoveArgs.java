@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ public interface DequeMoveArgs {
      * @return arguments object
      */
     static DequeMoveDestination pollLast() {
-        return new DequeMoveDestinationStep(DequeMoveParams.Direction.RIGHT);
+        return new DequeMoveParams(DequeMoveParams.Direction.RIGHT);
     }
 
     /**
@@ -43,7 +43,7 @@ public interface DequeMoveArgs {
      * @return arguments object
      */
     static DequeMoveDestination pollFirst() {
-        return new DequeMoveDestinationStep(DequeMoveParams.Direction.LEFT);
+        return new DequeMoveParams(DequeMoveParams.Direction.LEFT);
     }
 
 }

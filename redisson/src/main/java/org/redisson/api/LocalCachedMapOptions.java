@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package org.redisson.api;
 
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 import org.redisson.api.map.MapLoader;
@@ -23,13 +24,14 @@ import org.redisson.api.map.MapWriter;
  import org.redisson.api.map.MapWriterAsync;
 
 /**
- * Configuration for LocalCachedMap object.
+ * Use org.redisson.api.options.LocalCachedMapOptions instead
  * 
  * @author Nikita Koksharov
  *
  * @param <K> key type
  * @param <V> value type
  */
+@Deprecated
 public class LocalCachedMapOptions<K, V> extends MapOptions<K, V> {
     
     /**
@@ -130,6 +132,25 @@ public class LocalCachedMapOptions<K, V> extends MapOptions<K, V> {
 
     }
 
+    public enum ExpirationEventPolicy {
+
+        /**
+         * Don't subscribe on expire event.
+         */
+        DONT_SUBSCRIBE,
+
+        /**
+         * Subscribe on expire event using __keyevent@*:expired pattern
+         */
+        SUBSCRIBE_WITH_KEYEVENT_PATTERN,
+
+        /**
+         * Subscribe on expire event using __keyspace@N__:name channel
+         */
+        SUBSCRIBE_WITH_KEYSPACE_CHANNEL
+
+    }
+
     private ReconnectionStrategy reconnectionStrategy;
     private SyncStrategy syncStrategy;
     private EvictionPolicy evictionPolicy;
@@ -139,7 +160,10 @@ public class LocalCachedMapOptions<K, V> extends MapOptions<K, V> {
     private CacheProvider cacheProvider;
     private StoreMode storeMode;
     private boolean storeCacheMiss;
-    
+    private ExpirationEventPolicy expirationEventPolicy;
+    private boolean useObjectAsCacheKey;
+    private boolean useTopicPattern;
+
     protected LocalCachedMapOptions() {
     }
     
@@ -153,6 +177,7 @@ public class LocalCachedMapOptions<K, V> extends MapOptions<K, V> {
         this.cacheProvider = copy.cacheProvider;
         this.storeMode = copy.storeMode;
         this.storeCacheMiss = copy.storeCacheMiss;
+        this.useObjectAsCacheKey = copy.useObjectAsCacheKey;
     }
     
     /**
@@ -183,7 +208,10 @@ public class LocalCachedMapOptions<K, V> extends MapOptions<K, V> {
                     .cacheProvider(CacheProvider.REDISSON)
                     .storeMode(StoreMode.LOCALCACHE_REDIS)
                     .syncStrategy(SyncStrategy.INVALIDATE)
-                    .storeCacheMiss(false);
+                    .storeCacheMiss(false)
+                    .useObjectAsCacheKey(false)
+                    .useTopicPattern(false)
+                    .expirationEventPolicy(ExpirationEventPolicy.SUBSCRIBE_WITH_KEYEVENT_PATTERN);
     }
 
     public CacheProvider getCacheProvider() {
@@ -207,9 +235,13 @@ public class LocalCachedMapOptions<K, V> extends MapOptions<K, V> {
     }
 
     /**
-     * Defines local cache size. If size is <code>0</code> then local cache is unbounded.
+     * Defines local cache size.
+     * <p>
+     * If size is <code>0</code> then local cache is unbounded.
+     * <p>
+     * If size is <code>-1</code> then local cache is always empty and doesn't store data.
      * 
-     * @param cacheSize - size of cache
+     * @param cacheSize size of cache
      * @return LocalCachedMapOptions instance
      */
     public LocalCachedMapOptions<K, V> cacheSize(int cacheSize) {
@@ -362,6 +394,14 @@ public class LocalCachedMapOptions<K, V> extends MapOptions<K, V> {
         return this.storeCacheMiss;
     }
 
+    public boolean isUseObjectAsCacheKey() {
+        return useObjectAsCacheKey;
+    }
+
+    public boolean isUseTopicPattern() {
+        return useTopicPattern;
+    }
+
     /**
      * Defines whether to store a cache miss into the local cache.
      *
@@ -371,6 +411,61 @@ public class LocalCachedMapOptions<K, V> extends MapOptions<K, V> {
     public LocalCachedMapOptions<K, V> storeCacheMiss(boolean storeCacheMiss) {
         this.storeCacheMiss = storeCacheMiss;
         return this;
+    }
+
+    /**
+     * Defines whether to store CacheKey of an object key into the local cache. <br>
+     * This indicator only affects when {@link LocalCachedMapOptions#cacheProvider} != {@link CacheProvider#CAFFEINE}
+     *
+     * @param useObjectAsCacheKey - whether to store CacheKey of an object key into the local cache
+     * @return LocalCachedMapOptions instance
+     */
+    public LocalCachedMapOptions<K, V> useObjectAsCacheKey(boolean useObjectAsCacheKey) {
+        this.useObjectAsCacheKey = useObjectAsCacheKey;
+        return this;
+    }
+
+    /**
+     * Defines whether to use a global topic pattern listener
+     * that applies to all local cache instances belonging to the same Redisson instance.
+     *
+     * @param value whether to use a global topic pattern listener
+     * @return LocalCachedMapOptions instance
+     */
+    public LocalCachedMapOptions<K, V> useTopicPattern(boolean value) {
+        this.useTopicPattern = value;
+        return this;
+    }
+
+    /**
+     * Use {@link #expirationEventPolicy(ExpirationEventPolicy)} instead
+     *
+     * @param useKeyEventsPattern - whether to use __keyevent pattern topic
+     * @return LocalCachedMapOptions instance
+     */
+    @Deprecated
+    public LocalCachedMapOptions<K, V> useKeyEventsPattern(boolean useKeyEventsPattern) {
+        if (useKeyEventsPattern) {
+            this.expirationEventPolicy = ExpirationEventPolicy.SUBSCRIBE_WITH_KEYEVENT_PATTERN;
+        } else {
+            this.expirationEventPolicy = ExpirationEventPolicy.SUBSCRIBE_WITH_KEYSPACE_CHANNEL;
+        }
+        return this;
+    }
+
+    /**
+     * Defines how to listen expired event sent by Redis upon this instance deletion.
+     *
+     * @param expirationEventPolicy expiration policy value
+     * @return LocalCachedMapOptions instance
+     */
+    public LocalCachedMapOptions<K, V> expirationEventPolicy(ExpirationEventPolicy expirationEventPolicy) {
+        this.expirationEventPolicy = expirationEventPolicy;
+        return this;
+    }
+
+    public ExpirationEventPolicy getExpirationEventPolicy() {
+        return expirationEventPolicy;
     }
 
     @Override
@@ -406,5 +501,15 @@ public class LocalCachedMapOptions<K, V> extends MapOptions<K, V> {
     @Override
     public LocalCachedMapOptions<K, V> loaderAsync(MapLoaderAsync<K, V> loaderAsync) {
         return (LocalCachedMapOptions<K, V>) super.loaderAsync(loaderAsync);
+    }
+
+    @Override
+    public LocalCachedMapOptions<K, V> writerRetryAttempts(int writerRetryAttempts) {
+        return (LocalCachedMapOptions<K, V>) super.writerRetryAttempts(writerRetryAttempts);
+    }
+
+    @Override
+    public LocalCachedMapOptions<K, V> writerRetryInterval(Duration writerRetryInterval) {
+        return (LocalCachedMapOptions<K, V>) super.writerRetryInterval(writerRetryInterval);
     }
 }

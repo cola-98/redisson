@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import org.hibernate.cache.spi.access.AccessType;
 import org.hibernate.cache.spi.access.EntityRegionAccessStrategy;
 import org.hibernate.cfg.Settings;
 import org.redisson.api.RMapCache;
-import org.redisson.connection.ConnectionManager;
+import org.redisson.connection.ServiceManager;
 import org.redisson.hibernate.strategy.NonStrictReadWriteEntityRegionAccessStrategy;
 import org.redisson.hibernate.strategy.ReadOnlyEntityRegionAccessStrategy;
 import org.redisson.hibernate.strategy.ReadWriteEntityRegionAccessStrategy;
@@ -40,9 +40,9 @@ public class RedissonEntityRegion extends BaseRegion implements EntityRegion {
 
     private final Settings settings;
 
-    public RedissonEntityRegion(RMapCache<Object, Object> mapCache, ConnectionManager connectionManager, RegionFactory regionFactory,
+    public RedissonEntityRegion(RMapCache<Object, Object> mapCache, ServiceManager serviceManager, RegionFactory regionFactory,
                                 CacheDataDescription metadata, Settings settings, Properties properties, String defaultKey) {
-        super(mapCache, connectionManager, regionFactory, metadata, properties, defaultKey);
+        super(mapCache, serviceManager, regionFactory, metadata, properties, defaultKey);
         this.settings = settings;
     }
     

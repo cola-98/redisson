@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,6 +55,10 @@ public interface RLiveObjectService {
     
     /**
      * Finds the entities matches specified <code>condition</code>.
+     * <p><strong>
+     * NOTE: open-source version is slow.<br>
+     * Use <a href="https://redisson.pro">Redisson PRO</a> instead.
+     * </strong><p>
      * Usage example:
      * <pre>
      * Collection objects = liveObjectService.find(MyObject.class, Conditions.or(Conditions.in("field", "value1", "value2"), 
@@ -72,6 +76,10 @@ public interface RLiveObjectService {
 
     /**
      * Counts the entities matches specified <code>condition</code>.
+     * <p><strong>
+     * NOTE: open-source version is slow.<br>
+     * Use <a href="https://redisson.pro">Redisson PRO</a> instead.
+     * </strong><p>
      * Usage example:
      * <pre>
      * long objectsAmount = liveObjectService.count(MyObject.class, Conditions.or(Conditions.in("field", "value1", "value2"),
@@ -190,7 +198,7 @@ public interface RLiveObjectService {
      *
      * @param <T> Entity type
      * @param attachedObject - proxied object
-     * @return proxied object
+     * @return detachedObject object - not proxied object
      */
     <T> T detach(T attachedObject);
 

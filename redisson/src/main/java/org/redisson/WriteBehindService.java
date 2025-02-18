@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import org.redisson.command.CommandAsyncExecutor;
  * @author Nikita Koksharov
  *
  */
-public class WriteBehindService {
+public final class WriteBehindService {
 
     private final ConcurrentMap<String, MapWriteBehindTask> tasks = new ConcurrentHashMap<>();
     private final CommandAsyncExecutor executor;

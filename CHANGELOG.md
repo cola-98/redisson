@@ -1,7 +1,943 @@
 Redisson Releases History
 ================================
 
-Try __[Redisson PRO](https://redisson.pro)__ with **ultra-fast performance** and **support by SLA**.
+Upgrade to __[Redisson PRO](https://redisson.pro)__ with **advanced features**.
+
+### 27-Jan-2025 - 3.44.0 released
+
+Feature - native eviction implemented for [JCache](https://redisson.org/docs/cache-api-implementations/#local-cache-and-data-partitioning) API  
+Feature - advanced eviction implemented for [JCache](https://redisson.org/docs/cache-api-implementations/#local-cache-and-data-partitioning) API  
+Feature - `RKeyAsync.getKeysAsync()` method added (thanks to @seakider)  
+Feature - added `commandsMap` setting to `CommandsLoadBalancer` object  
+Feature - added `regex` setting to `RandomLoadBalancer` and `RoundRobinLoadBalancer` objects to filter nodes  
+Feature - Unix Domain Socket (UDS) support for a single mode through "redis+uds://" or "valkey+uds://" scheme  
+Feature - `lockWatchdogBatchSize` setting added  
+
+Fixed - `RBuckets.get()` method doesn't use nameMapper in single mode  
+Fixed - `valkeys` scheme can't be used in Sentinel mode  
+Fixed - closed channel detection during connection ping process  
+Fixed - RSearch throws an error if nocontent param defined (thanks to @seakider)  
+Fixed - `RemovedListener` is invoked incorrectly by `JCache.getAll()` method  
+Fixed - synthetic class shouldn't be allowed to be used as a comparator for `RPriorityQueue` objects  
+Fixed - master node address isn't resolved through NatMapper object in Sentinel mode (tnanks @aramperes)  
+Fixed - STOPWORDS 0 can't be defined during RSearch index creation  
+Fixed - `RScript.evalSha()` method doesn't work in cluster mode  
+Fixed - task id duplication check added to `RScheduledExecutorService` methods
+Fixed - failover handling in Sentinel mode  
+Fixed - Micronaut `Session.put()` method doesn't remove an entry if value = null  
+Fixed - `RReadWriteLock.unlock()` method doesn't respect the lock owner  
+Fixed - lock watchdog doesn't renew RLock if an expection has been thrown  
+
+### 13-Jan-2025 - 3.43.0 released
+
+Feature - `RObservable` interface for listeners added for RLock objects (thanks to @seakider)  
+
+Fixed - `RExecutorService` workers stop working (regression since 3.42.0) (thanks to @seakider)  
+Fixed - `RLocalCacheMap.remove()` method hangs if called inside a transaction  
+Fixed - poll methods of `RTimeSeries` and `RScoredSortedSet` objects return null instead of empty lists  
+Fixed - `RSet.containsEach()` method returns null instead of empty list  
+Fixed - `RLocalCachedMap.fastRemove()` method may throw NPE if `storeMode = LOCALCACHE`  
+
+### 7-Jan-2025 - 3.42.0 released
+
+Feature - listeners support in Spring's CacheConfig object (thanks to @seakider)  
+Feature - CLIENT LIST command support for Spring Data (thanks to @seakider)  
+Feature - cluster nodes state added in `node ... hasn't been discovered yet` error  
+Feature - `onConnectFailed()` and `onPingFailed()` methods with an error argument added to `FailedNodeDetector` object  
+Feature - support of "valkey" and "valkeys" schemes in urls  
+
+Fixed - `RScheduledExecutorService` tasks might not be canceled (thanks to @seakider)  
+Fixed - `MASTERDOWN` error handling  
+Fixed - `RBloomFilter.contains()` should return false if the filter doesn't exist (thanks to @seakider)  
+Fixed - `RRemoteService` calls do not throw RemoteServiceTimeoutException, leaving threads stuck (thanks to @seakider)  
+Fixed - `RMap.addAndGet()` method doesn't work with MapWriter  
+Fixed - `RScheduledExecutorService` tasks are not running on the next executor if the app was killed (thanks to @seakider)  
+Fixed - `RListMultimapReactive.get()` and `RSetMultimapReactive.get()` methods return object with methods which throw exceptions  
+Fixed - `RPriorityBlockingQueue.take()` method consumes an element even after the calling thread has been interrupted  
+Fixed - `RExecutorService` result futures might be never completed  
+Fixed - `RRemoteService` shouldn't allocate a new worker if requestQueue is empty  
+Fixed - `RListMultimapReactive.get()` method doesn't work (thanks to @kramer)  
+Fixed - `RListMultimapRx.get()` method doesn't work  
+Fixed - `destroy()` method doesn't work if called immediately after creation of `RDelayedQueue` object  
+
+### 23-Dec-2024 - 3.41.0 released
+
+Feature - `RPermitExpirableSemaphore.getLeaseTime()` method added (thanks to @seakider)  
+Feature - `sslVerificationMode` setting added  
+
+Fixed - `RPermitExpirableSemaphore.release(java.util.List)` shouldn't release permits if one of them doesn't exist (thanks to @seakider)  
+Fixed - `RTopic` listeners leak if they are defined as a lambda  
+Fixed - `RPriorityBlockingQueue.draintTo()` method shouldn't resend command on response timeout  
+Fixed - `RandomXoshiro256PlusPlus` might block Redisson initialization  
+
+### 12-Dec-2024 - 3.40.2 released
+
+Improvement - optimization LRUCacheMap speed by up to 200x  
+
+Fixed - Quarkus config parsing with sentinel nodes (thanks to @blacksails)  
+Fixed - starvation of pub/sub connections may cause a memory leak  
+
+### 06-Dec-2024 - 3.40.1 released
+
+Improvement - Netty pending tasks amount report in timeout exceptions  
+
+Fixed - Redis or Valkey hostname parsing  
+Fixed - `NoClassDefFoundError` is thrown during run with Spring Boot 3.4.0 in GraalVM native mode  
+Fixed - `RTopic` and `RShardedTopic` fail to resubscribe after node's DNS record change (regression since 3.27.0)  
+
+### 03-Dec-2024 - 3.40.0 released
+
+Feature - metrics added to `RClusteredTopic`, `RReliableTopic`, `RClusteredReliableTopic`, `RShardedTopic`, `RJsonStore` and `RLocalCachedJsonStore` objects  
+Feature - Spring Data Redis 3.4.x module added  
+Feature - Spring Boot upgraded to 3.4.0  
+Feature - `setIfLess()` and `setIfGreater()` methods added to `RAtomicDouble` and `RAtomicLong` objects (thanks to @seakider)  
+Feature - `RMultimap.fastReplaceValues()` method added (thanks to @davidreis97)  
+
+Fixed - IPV6 uris with braces are parsed incorrectly
+Fixed - minCleanUpDelay setting isn't applied during the first run of the EvictionTask  
+Fixed - master node shouldn't be changed on new ip addition for AWS Serverless endpoint  
+Fixed - Quarkus native build requires Snappy library  
+Fixed - Quarkus 3.14+ compatibility  
+Fixed - `RBitSet.length()` method returns unexpected value and caused RedisException in some case (thanks to @seakider)  
+Fixed - `TypedJsonJacksonCodec` doesn't catch Exception (thanks to @lyrric)  
+
+### 15-Nov-2024 - 3.39.0 released
+
+Feature - [partitioning](https://redisson.org/docs/data-and-services/publish-subscribe/#partitioning) implementation for `RTopic` object  
+Feature - [partitioning](https://redisson.org/docs/data-and-services/publish-subscribe/#partitioning_1) implementation for `RShardedTopic` object  
+Feature - [partitioning](https://redisson.org/docs/data-and-services/publish-subscribe/#partitioning_2) implementation for `RReliableTopic` object  
+Feature - [ZStandard](https://github.com/facebook/zstd) compression codec added (ZStdCodec)  
+Feature - ability to register [listeners](https://redisson.org/docs/data-and-services/collections/#listeners_1) for `RListMultimap` and `RSetMultimap` objects  
+Feature - ability to register [listeners](https://redisson.org/docs/data-and-services/collections/#listeners_10) for `RTimeSeries` object  
+
+Fixed - possible race-condition in `RMapCache.computeIfAbsent()` method  
+Fixed - possible race-condition in `computeIfAbsent()`, `computeIfPresent()` methods of RMap object  
+Fixed - `RMapCache.computeIfAbsentAsync()` method isn't implemented  
+Fixed - use CursorId in ScanIteration to avoid long overflow in Spring Data 3.3 implementation (thanks to @vlastikcz)  
+Fixed - unable to cancel a task created by `RExecutorService.scheduleAtFixedRate()` method (thanks to @zcxsythenew)  
+Fixed - potential LocalCache memory leak if useObjectAsCacheKey = true (thanks to @lehuuthanh5)  
+Fixed - EntryListener is not working on Turkish language Windows 10  
+Fixed - Redisson shutdown exception is thrown during background process of expired Tomcat sessions  
+Fixed - some methods of Reactive and RxJava API don't work in GraalVM native image  
+Fixed - `RTransactionRx` and `RTransactionReactive` don't work in GraalVM native image  
+Fixed - `JsonJacksonCodec` doesn't work in GraalVM native image  
+Fixed - NPE is thrown if `RExecutorService` task submitted in GraalVM native image  
+Fixed - `RObject.rename()` method does not replace an existing structure in cluster mode  
+
+### 31-Oct-2024 - 3.38.1 released
+
+Fixed - Kryo codec upgraded to 5.6.2 for JDK 8 compatibility (thanks to @Wujiaxuan007)  
+Fixed - pollAsync() and removeAsync() methods of RPriorityQueue and RPriorityDeque objects aren't guarded properly with lock  
+Fixed - Spring Cache `Cacheable(sync)` annotation loads value multiple times for reactive types or completableFuture
+
+### 30-Oct-2024 - 3.38.0 released
+
+Feature - [Local cache for Live Object Service](https://redisson.org/docs/data-and-services/services/#local-cache) support  
+Feature - [RClientSideCaching](https://redisson.org/docs/client-side-caching/) object added. Client side caching through RESP3 protocol  
+Feature - Tomcat 11 support  
+Feature - `RBatch.getSearch()` method added (thanks to @pfyod)  
+Feature - `RedissonClient.getMultiLock()` method added for locking on objects (thanks to @lyrric)  
+Feature - `RPatternTopic.removeListener()` accepts multiple ids  
+Feature - `LocalCachedMapOptions.useTopicPattern()` setting added  
+Feature - InetAddress and SocketAddress serialization added to Kryo5Codec
+
+__Breaking change - RLongAdder and RDoubleAdder topic channel name has been renamed__
+
+Improvement - timeToLive parameter renamed to keepAliveTime for RRateLimiter.`trySetRate()` and `setRate()` methods (thanks to @lyrric)  
+Improvement - Add check, The parameter timeToLive should be greater than or equal to rateInterval (thanks to @lyrric)  
+
+Fixed - `lazyInitialization=true` doesn't work in cluster mode (regression since 3.27.0)  
+Fixed - Spring Cache @Cacheable(sync) doesn't work with reactive types or completableFuture  
+Fixed - Pub/Sub connections randomly disconnecting (regression since 3.26.0) (thanks to @Wujiaxuan007)  
+Fixed - `RLiveObjectService.persist()` and `merge()` methods, when called with multiple arguments, return detached objects  
+Fixed - `RJsonBucketReactive` and `RJsonBucketRx` use Reactive Types as arguments  
+Fixed - `ClassNotFoundException` is thrown when a LiveObject expires  
+Fixed - Micronaut native image build  
+Fixed - Quarkus native image build  
+Fixed - `RSearch.info()` method throws an exception on infinity values (thanks to @iamtakingiteasy)  
+
+### 02-Oct-2024 - 3.37.0 released
+
+Feature - `findCommon()` and `findCommonLength()` methods added to `RBucket` object  
+Feature - `RMapCache.computeIfAbsent()` method with TTL parameter added (thanks to @lyrric)  
+Feature - Apache Tomcat `RedissonSessionManager.setConfig()` method added (thanks to @jglapa)  
+Feature - `LocalCachedMapOptions.useObjectAsCacheKey()` setting added (thanks to @lehuuthanh5)  
+Feature - `trySetRate()` and `setRate()` methods with TTL parameter added to `RRateLimiter` object  
+Feature - `RKeys.getKeys()` method with type parameter added  
+
+Improvement - `RRemoteService` method calls optimization  
+
+Fixed - Spring Data Redis method `RedisSetCommands.isMember()` doesn't work  
+Fixed - Spring Data Redis `xcaim()` and `xClaimJustId()` methods don't use getMinIdleTime() parameter (thanks to @jinia91)  
+Fixed - `retainAll()` and `containsAll()` methods of `RSet` object throw "too many results to unpack" error  
+Fixed - `ServiceManager.execute()` method may hang in case of exception  
+Fixed - `RedissonNode.shutdown()` method doesn't stop executors  
+Fixed - listeners reattach process should be stopped on Redisson shutdown  
+Fixed - `BiHashMap` usage removed  
+Fixed - 100% CPU usage by CommandsQueue in rare cases  
+Fixed - `ProtobufCodec` doesn't work with `CompositeCodec`  
+
+### 09-Sep-2024 - 3.36.0 released
+
+Feature - `Kryo5Codec` `useReferences` setting added  
+Feature - `RListMultimapCacheNative` and `RSetMultimapCacheNative` objects added. Require Redis 7.4+  
+Feature - `AggregationOptions.sortBy()` method with `withCount` parameter added (thanks to @pfyod)  
+Feature - `allowedClasses` setting added to `FuryCodec`  
+Feature - `addIfAbsent(Map)` method added to `RSetCache` object (thanks to @lyrric)  
+
+Improvement - 'hmget' should be instead of 'hget' in `RMapCache.getAllWithTTLOnly()` method  
+
+Fixed - RedisExecutor throws "Failed to submit a listener notification task" error during shutdown  
+Fixed - Keep the jmockit version in the plugin consistent with that in the dependencies (thanks to @lyrric)  
+Fixed - hostname after comma in Redis Cluster topology isn't parsed  
+Fixed - `drainToAsync()` method returns an incorrect value (thanks to @seakider)  
+Fixed - numeric cast in `CommandDecoder`  
+Fixed - `RLiveObject` value shouldn't be deleted during index update  
+Fixed - `RSetCache.addAllIfAbsent()` method doesn't work  
+Fixed - missed `getSetMultimapCache()` and `getListMultimapCache()` methods in `RBatchReactive` object  
+Fixed - missed `getMapCacheNative()` method in `RBatch` object  
+Fixed - `MapValueDecoder` throws NPE  
+Fixed - `EnumMap` type handling by `Kryo5Codec`  
+Fixed - `Kryo5Codec` `registrationRequired` setting replaced with `allowedClasses`  
+Fixed - JCache eviction task isn't removed on `close()` method invocation  
+Fixed - missed `destroy()` method for `RListMultimapCache` and `RSetMultimapCache` objects  
+
+### 22-Aug-2024 - 3.35.0 released
+
+Feature - `INDEXEMPTY` option added to tag and text fields in `RSearch.createIndex()` method  
+Feature - `INDEXMISSING` option added to all fields in `RSearch.createIndex()` method  
+Feature - `StreamMessageId.LAST` option added  
+Feature - `copy()` and `copyAndReplace()` methods added to `RObject` interface  
+Feature - [Apache Fury](https://github.com/apache/fury) codec support  
+Feature - `RSetCache` object supports `TrackingListener`, `SetAddListener` and `SetRemoveListener` listeners  
+Feature - `RClusteredMapCacheNative` object implemented. Requires Redis 7.4+  
+Feature - `RLocalCachedMapCacheNative` object implemented. Requires Redis 7.4+  
+Feature - `localcache_native` and `clustered_native` implementations added to Quarkus module. Requires Redis 7.4+  
+Feature - `RedissonClusteredCacheNative` and `RedissonLocalCachedCacheNative` implementations added to MyBatis module. Requires Redis 7.4+
+Feature - `RedissonClusteredSpringCacheNativeManager` and `RedissonSpringLocalCachedCacheNativeManager` implementations added to Spring Cache module. Requires Redis 7.4+  
+Feature - `RedissonClusteredNativeRegionFactory` and `RedissonLocalCachedNativeRegionFactory` added to Hibernate module. Requires Redis 7.4+  
+Feature - `local-caches-native` and `clustered-caches-native` implementations added to Micronaut module. Requires Redis 7.4+  
+
+Improvement - `ProtobufCodec` memory allocation optimization  
+Improvement - [Apache Fury](https://github.com/apache/fury) codec optimization (thanks to @chaokunyang)  
+Improvement - quarkus should make an attempt to read config file using Thread's ContextClassLoader  
+Improvement - quarkus should make an attempt to read config file using Thread's ContextClassLoader (thanks to @seakider)  
+Improvement - don't take lock for `RMap.computeIfAbsent()` if only get is needed (thanks to @shreyas-sprinklr)  
+
+Fixed - writer, writeMode, writerAsync, writeBehindDelay, writeBehindBatchSize, loader, loaderAsync settings aren't applied to caches-native in Micronaut module  
+Fixed - missed `caches-native` implementation for Micronaut 3.x and Micronaut 2.x  
+Fixed - a new retry attempt to the same node isn't made for INFO_REPLICATION, SENTINEL_GET_MASTER_ADDR_BY_NAME, SENTINEL_SENTINELS, SENTINEL_SLAVES and CLUSTER_NODES commands  
+Fixed - `RType.JSON` and `RType.STREAM` can't be resolved by `RKey.getType()` method  
+Fixed - `RKeys.removeListener()` method doesn't remove `NewObjectListener` and `SetObjectListener`  
+Fixed - `copy()` method doesn't works with db (thanks to @seakider)  
+Fixed - `maven.compiler.release` setting isn't defined  
+Fixed - `RSearch.info()` method throws `NumberFormatException` (thanks to @iamtakingiteasy)  
+Fixed - timeout parameters defined per object aren't applied to `RJsonBuckets` and `RJsonBucket` objects  
+Fixed - RedisException is thrown by `.removeAll()` and `.indexOf()` methods of `RedissonSubList` object (thanks to @seakider)  
+Fixed - wrong event keyspace name for `MapCacheNative` object (thanks to @larryTheCoder)  
+Fixed - missed `rename()` and `renamenx()` methods implementation for `RIdGenerator`, `RMapCache` and `RTimeSeries` objects  
+Fixed - `Kryo5Codec` doesn't handle `UnmodifiableCollection`, `SynchronizedCollection` and `CheckedCollection`  
+Fixed - `RRateLimiter` incorrect rate count in the event of an attempt to exceed the limit  
+Fixed - `credentials-resolver`, `failed-slave-node-detector`, `command-mapper`, `name-mapper`, `nat-mapper` settings aren't recognized by Helidon and Quarkus  
+Fixed - `RMultimapCacheReactive.expireKey()` method returns Single instead of Reactor Mono  
+Fixed - `@RObjectField` annotation with codec option has no effect  
+Fixed - an exception is thrown if the `@RObjectField` annotation is defined on a field  
+Fixed - `RDestroyable.destroy()` method doesn't remove listeners  
+Fixed - FailedSlaveNodeDetector's parameters by can't be defined in YAML config  
+
+
+### 31-Jul-2024 - 3.34.1 released
+
+Fixed - RObject.rename() method doesn't work in cluster
+
+### 30-Jul-2024 - 3.34.0 released
+
+Feature - RJsonBuckets object added (thanks to @seakider)  
+Feature - `remainTimeToLive(Set keys)` and `clearExpire(Set keys)` methods added to `RMapCacheNative` object  
+Feature - `eval()` and `evalSha()` methods added to `RScript` object for execution on all nodes in Redis Cluster  
+
+Improvement - performance optimization for Apache Tomcat Session management  
+Improvement - default value of quietPeriod set to 0 in `RedissonClient.shutdown()` method  
+Improvement - upgrade protobuf from 3.16.3 to 4.27.2 (thanks to @zzhlhc)  
+
+Fixed - Apache Tomcat Session Manager throws CROSSSLOT Keys in request don't hash to the same slot (regression since 3.32.0)  
+Fixed - empty partitions shouldn't be skipped in cluster topology scan  
+Fixed - `ClusterConnectionManager.checkSlotsMigration()` method throws NPE  
+Fixed - RSearch IndexInfoDecoder may throw NPE  
+Fixed - local cached Map implementations don't emit cache clear event on `clear()` or `delete()` methods call  
+Fixed - `RObject.rename()` method doesn't work in cluster  
+Fixed - a new attempt to send a command should be made right after channel reconnection  
+Fixed - 'race condition' while calling RLock.tryLock() method (thanks to @pad-master82)  
+Fixed - Can't connect to servers error doesn't show exception reported during connection  
+Fixed - `SeekableByteChannel.truncate()` method (thanks to @seakider)  
+Fixed - `RMap.computeAsync()` method doesn't handle empty keys properly (thanks to @phrone)  
+
+### 17-Jul-2024 - 3.33.0 released
+
+Feature - [RJsonStore](https://github.com/redisson/redisson/wiki/7.-distributed-collections/#724-json-store) object added  
+Feature - [RLocalCachedJsonStore](https://github.com/redisson/redisson/wiki/7.-distributed-collections/#7241-json-store-local-cache) object added  
+Feature - `RSearch.getIndexes()` method added  
+Feature - `RedissonRegionNativeFactory` added for Hibernate module. Requires Redis 7.4+  
+Feature - `RedissonSpringCacheNativeManager` implemented. Requires Redis 7.4+  
+Feature - `RedissonCacheNative` implementation added for Mybatis cache. Requires Redis 7.4+  
+Feature - `caches-native` cache type added to Micronaut module. Requires Redis 7.4+    
+
+Improvement - Spring Cache `RedissonCache.put()` method optimization  
+
+__Breaking change - JsonCodec interface refactoring__
+
+Fixed - re-added master node isn't updated in Cluster topology  
+Fixed - expiration time isn't set for Apacht Tomcat Manager `redisson:tomcat_notified_nodes` keys (thanks to @ehardy)  
+Fixed - RSearch `AggregationOptions.loadAll()` setting isn't applied  
+Fixed - containsAll() method of RList, RQueue, RMultimap objects returns incorrect result (thanks to @seakider)  
+Fixed - too many requests with small threads amount may cause OOM  
+Fixed - connection leak during high load with few connections  
+Fixed - RingBuffer#setCapacity, trim list incorrect (thanks to @seakider)  
+Fixed - password shouldn't be printed in logs  
+Fixed - encoded user/password in URL aren't accepted  
+
+### 24-Jun-2024 - 3.32.0 released
+
+Feature - Quarkus Cache implementation added  
+Feature - `RMapCacheNative` implementation which uses Redis 7.4+ commands  
+Feature - unlinkByPattern() method added to RKeys interface (thanks to @seakider)  
+
+Fixed - Apache Tomcat request.changeSessionId() method does not change the session id in Redis (thanks to @bclay2116)  
+Fixed - RSearch parse params error (thanks to @seakider)  
+Fixed - RSearch.info() throws `NumberFormatException` (thanks to @seakider)  
+Fixed - cluster failover handling  
+Fixed - last master node shouldn't be removed in cluster topology  
+Fixed - duplicated master/slave added log output in sentinel mode  
+Fixed - connection leak if master change operation failed during failover  
+Fixed - `RxJava3` request can't be canceled  
+Fixed - `RFairLock` doesn't calculate remaining ttl properly before next acquisition attempt  
+Fixed - `scanInterval` setting check  
+Fixed - `ElementsSubscribeService.resubscribe()` method throws `RedissonShutdownException`  
+Fixed - `RMap.getAll()` method throws an exception if result of `RMap.keySet()` method passed as an argument  
+Fixed - Redis node random selection doesn't work properly  
+Fixed - concurrency problem during RLock expiration renewal (thanks to @seakider)  
+Fixed - `RListMultimap` throws too many results to unpack error  
+Fixed - entry shutdown during cluster slots migration check  
+
+### 31-May-2024 - 3.31.0 released
+
+Feature - Spring Boot 3.3.0 integration  
+Feature - Spring Data Redis 3.3.0 integration  
+Feature - allow retry of `NOREPLICAS` error (thanks to @ghollies)  
+
+Improvement - `SequentialDnsAddressResolverFactory` default `concurrencyLevel` set to 2  
+Improvement - `ThreadLocalRandom` replaced with `xoshiro256++` RNG to avoid collisions  
+
+Fixed - cluster failover handling  
+Fixed - cluster topology scan shouldn't be stopped by any exception  
+Fixed - `RSetMultiMap` throws `too many results to unpack` error  
+Fixed - append commands error when using batch mode (thanks to @seakider)  
+Fixed - `ERR unknown command EVALSHA_RO` error shouldn't be logged  
+Fixed - `TransactionalBucket#set(V, Duration)` `PSETEX` command is called before `MULTI` command (thanks to @seakider)  
+Fixed - `CommandMapper` isn't applied to Lua scripts  
+Fixed - incorrect connection release if `BatchOptions.executionMode` = `REDIS_WRITE_ATOMIC` or `REDIS_READ_ATOMIC` (thanks to @seakider)  
+Fixed - `RFairLock` methods throw 'attempt to compare nil with number' error  
+Fixed - Spring Data Redis `RedissonConnectionFactory.getSentinelConnection()` method throws error on the first offline sentinel  
+Fixed - read mode = SLAVE isn't applied for `RSet.random()` methods  
+Fixed - Keyspace notifications should be listened only on master nodes  
+Fixed - `RListMultimap.removeAll()` method always deletes link to list  
+Fixed - `RLockReactive` methods don't work in native image  
+Fixed - Correctly update shutdown timeout after each step in connection manager shutdown (thanks to @MartinEkInsurely)  
+Fixed - broken tck `JCache` tests  
+Fixed - not all sentinels defined in the configuration are registered  
+
+### 10-May-2024 - 3.30.0 released
+Feature - `sslKeystoreType` setting added  
+Feature - `RPatternTopic.getActiveTopic()` method added (thanks to @MasterShi)  
+Feature - `RJsonBucket.merge()` method added  
+Feature - Async, Rx, Reactive interfaces implemented for `RBloomFilter` object  
+Feature - fallback mode for JCache  
+Feature - [passwords encryption](https://github.com/redisson/redisson/wiki/2.-Configuration#223-passwords-encryption) support  
+Feature - [Spring Cloud Stream](https://github.com/redisson/redisson/wiki/14.-Integration-with-frameworks/#149-spring-cloud-stream) integration  
+
+Improvement - configuration variable defined as Java system property overrides environment variable  
+
+Fixed - io.projectreactor package should be defined as optional in OSGi Manifest  
+Fixed - Spring Data Redis `StreamPollTask.deserializeAndEmitRecords()` method throws NPE after failover  
+Fixed - Spring Data Redis blocking poll commands can't be reattached after failover  
+Fixed - Unable to find session error reported by `RedissonSessionManager`  
+Fixed - Sentinels discovery is applied at Redisson startup if `sentinelsDiscovery = true`  
+Fixed - master node is used for read operations after slave node addition if `readMode = SLAVE` in replicated mode  
+Fixed - failover handling of blocking methods calls with defined timeout. RStream, RBlockingQueue objects  
+Fixed - multiple `RLocalCachedMap` objects don't work in the same RTransaction (thanks to @vlad-ogol @RajaJaisankar)  
+Fixed - codec setting isn't applied in `redisson.getMap(MapOptions)` method  
+Fixed - Live Object field can't set to null value  
+Fixed - `SentinelConnectionManager` stops scheduling topology change change / dns check after host resolution error  
+Fixed - `RMapCache.fastPutIfExistsOperation()` method uses incorrect pubsub channel
+
+### 22-Apr-2024 - 3.29.0 released
+Feature - `NewObjectListener` added to track created objects  
+Feature - `NewObjectListener` and `SetObjectListener` can be registered with `RKeys.addListener()` method  
+Feature - `subscribeOnElements()`, `subscribeOnLastElements()` and `subscribeOnFirstElements()` methods wait for `CompletionStage` to complete before polling the next element  
+Feature - `shardedSubscriptionMode` setting added in Cluster configuration  
+Feature - `RSemaphore.trySetPermits()` method with ttl parameter added  
+Feature - `getDeletedIds()` method added to `RStream` `AutoClaimResult` object  
+
+Improvement - responses map lock replaced with fine-grained entry locking in `RRemoteService` and `RScheduledExecutorService`  
+
+Fixed - `RStream.autoClaim()` method throws ClassCastException  
+Fixed - `RSearch` aggregate expression applied incorrectly  
+Fixed - `LocalCachedMapDisabledKey` event is parsed incorrectly if local cache used with `RTransaction`  
+Fixed - Slave node in cluster mode isn't shutdown properly if `readMode = MASTER` and `subscribeMode = MASTER` (regression since 3.27.2)  
+Fixed - race condition during cluster topology update causes slave added/removed events  
+Fixed - OSGi MANIFEST should define optional dependencies  
+Fixed - `TimeoutException` is thrown if `connectionMinimumIdleSize = 0`  
+Fixed - `ClassCastException` is thrown for Reactive/Rx RemoteService invocation if Redisson instance isn't Reactive/Rx  
+Fixed - semaphore object is not deleted after `RLocalCachedMap.clearLocalCache()` method invocation  
+Fixed - `AggregationOptions.groupBy()` setting with reducers used in `RSearch.aggregate()` method causes an exception  
+Fixed - `AggregationOptions.groupBy()` setting usage with `RSearch.aggregate()` method causes an exception if reducers aren't defined  
+Fixed - `AggregationOptions.sortBy()` setting usage with `RSearch.aggregate()` method causes an exception  
+Fixed - resource leak error when executing multiple contains operation of `RSet` in transaction (thanks to @wynn5a)  
+Fixed - jmockit upgraded to 1.52.0 inside maven-surefire-plugin (thanks to @roharon)  
+
+### 10-Apr-2024 - 3.28.0 released
+
+Feature - [Multi Sentinel mode](https://github.com/redisson/redisson/wiki/2.-Configuration/#211-multi-sentinel-mode) implementation  
+Feature - `RLocalCachedMapCacheV2` object implemented with effecient partitioning and advanced entry eviction  
+Feature - graceful shutdown in quarkus (thanks to @naah69)  
+
+Improvement - `RLongAdder` and `RDoubleAddder` should use sharded topic if possible  
+Improvement - reduced CPU and Memory consumption by `ClusterConnectionManager.getLastPartitonsByURI()` method  
+Improvement - `RedisURI.hashCode()` caching to reduce CPU consumption  
+Improvement - shutdown check added in `RTopic.removeListener()` method  
+
+Fixed - incorrect detection of sharded pubsub support  
+Fixed - `RBatch` does not work with RKeys.randomKeyAsync() method (thanks to @wynn5a)  
+Fixed - unresolved Redis node hostname in cluster mode affects cluster topology scan  
+Fixed - `MASTER` nodes aren't used if `readMode = MASTER_SLAVE`  
+Fixed - `RLock`, `RFencedLock`, `RReadWriteLock` miss unlock messages and wait a defined timeout before a next attempt or hang  
+Fixed - `RSemaphore`, `RPermitExpirableSemaphore` miss release messages and wait a defined timeout before a next attempt or hang  
+Fixed - incorrect value of `RLongAdder.sum()` and `RDoubleAddder.sum()` methods if multiple Adder instances for the same Redisson object are used  
+Fixed - `CountDownLatch.await()` method may throw NPE  
+Fixed - ExecutionException handling in RExecutorService, RLock, RPermitExpirableSemaphore, RSemaphore objects  
+Fixed - `ConcurrentModificationException` is thrown on RedissonSession save method if readMode = MEMORY  
+Fixed - Spring Data Redis zPopMin() and zPopMax() methods don't work (thanks to @bimslab)  
+
+### 12-Mar-2024 - 3.27.2 released
+
+Feature - `RShardedTopic.countSubscribers()` method implemented  
+Feature - `RedissonMultiLock` implements `isHeldByThread()` and `isHeldByCurrentThread()` methods  
+
+Fixed - Multiple locking of RLock reset remainTimeToLive to config default  
+Fixed - exception thrown by `natMapper` is not shown in logs  
+Fixed - OSGi jdk.net package import should be optional  
+Fixed - `ServiceManager.resolveAll()` method throws NPE  
+Fixed - `RObject.addListenerAsync()` method throws `UnsupportedOperationException`  
+Fixed - `StatusListener` doesn't work with `RShardedTopic`  
+Fixed - NPE is thrown in cluster mode if slave node added  
+Fixed - continuously reconnecting to a removed slave node in cluster mode  
+Fixed - incorrect handling of TrackingListener removal  
+Fixed - `FlushListener` receives duplicate events  
+Fixed - `SlotsDecoder` throws NPE on empty result  
+Fixed - Clash between RedissonCache and Spring (6.1+) Cache interface methods  
+Fixed - `RedissonClient.shutdown()` method hangs at `serviceManager.getShutdownLatch()` invocation  
+Fixed - "Failed to submit a listener notification task. Event loop shut down?" error caused by `PingConnectionHandler`  
+Fixed - `JsonCodecWrapper` isn't cached properly  
+
+### 28-Feb-2024 - 3.27.1 released
+
+Feature - added `TrackingListener` support to `RList`, `RQueue`, `RDeque`, `RBlockingQueue`, `RBlockingDeque`, `RDelayedQueue`, `RRingBuffer` objects  
+Feature - `addListener()`, `random()` methods added to `RLexSortedSet` object  
+
+Improvement - show log warning "DNS TCP fallback on UDP query timeout disabled" if Netty version is lower 4.1.105  
+Improvement - ChannelName.toString() conversion optimization  
+
+Fixed - `retryInterval` and `retryAttempts` settings aren't applied in case of 'READONLY You can't write against a read only replica.' error  
+Fixed - `RRemoteService` may cause CPU spike after Master failover  
+Fixed - `FlushListener` causes `ClassCastException`  
+Fixed - `TrackingListener` causes `ClassCastException`  
+Fixed - `RedissonSetCache.addIfAbsentAsync()` uses incorrect argument for zadd (thanks @fooooxxxx)  
+
+### 20-Feb-2024 - 3.27.0 released
+
+Feature - [client tracking](https://github.com/redisson/redisson/wiki/10.-additional-features/#109-client-tracking-listener) support. `TrackingListener` is available for `RBucket`, `RStream`, `RScoredSortedSet`, `RSet`, `RMap` and `RBucket` objects  
+Feature - added `RKeys.addListener()` method to register global listeners  
+Feature - `FlushListener` added to track flushdb/flushall command invocation  
+Feature - `Kryo5Codec` constructor with `registrationRequired` parameter added  
+Feature - `nettyExecutor` setting added  
+Feature - enable DNS TCP fallback when UDP query timeout for `RoundRobinDnsAddressResolverGroupFactory` and `SequentialDnsAddressResolverFactory`  
+
+Improvement - cache result of `INFO REPLICATION` command for `RLock` objects  
+
+Fixed - Spring Data Redis `ReactiveKeyCommands.pExpire()` method throws an exception  
+Fixed - NPE is thrown by `RedisExecutor.handleError()` method  
+Fixed - sharded pubsub detection for `Apache Tomcat Session Manager`, `RMapCache` and `RLocalCachedMap` objects  
+Fixed - Redisson's threads aren't shutdown if Redis node address isn't defined  
+Fixed - NPE is thrown while creating `RLocalCacheMap` object without WriteMode value  
+Fixed - incorrect RESP3 protocol parsing causes `SlaveConnectionPool no available Redis entries` error  
+Fixed - repeated new connections with AWS Elasticache serverless  
+Fixed - internal `LRUCacheMap` object throws `ConcurrentModificationException`  
+
+### 12-Feb-2024 - 3.26.1 released
+
+Feature - enable DNS TCP fallback when UDP query timeout (thanks to @hellojukay)  
+Feature - `StreamMessageId.autogenerateSequenceId()` method added (thanks to @mrmx)  
+Feature - `RLockReactive.isHeldByThread()` method added (thanks to @sanail)  
+
+Fixed - missed implementation of Spring Data Redis `ReactiveStringCommands.bitField()` method  
+Fixed - Spring Data Redis `opsForCluster().randomKey()` method throws `UnsupportedOperationException`  
+Fixed - `JCache.close()` method throws `IllegalStateException` if statistics enabled  
+Fixed - doubled connections to the master node if `readMode = MASTER_SLAVE` or there are no slave nodes  
+Fixed - `RSearch.delDict()` and `RSearch.addDict()` methods throw NPE  
+Fixed - connection ping handler doesn't use `commandTimeout` setting  
+Fixed - repeated new connections with AWS Elasticache serverless  
+Fixed - `RLock` throws `ERR unknown command 'wait'` with AWS Elasticache serverless  
+Fixed - `RSearchReactive.dropIndex()` method doesn't call onComplete() handler  
+
+
+### 16-Jan-2024 - 3.26.0 released
+
+Feature - ability to specify `retryInterval`, `retryAttempts`, `timeout` settings per Redisson object. Please refer to the [documentation](https://github.com/redisson/redisson/wiki/3.-operations-execution)  
+Feature - `LocalCachedMapOptions.expirationEventPolicy` setting added  
+Feature - `StreamAddListener`, `StreamCreateConsumerListener`, `StreamCreateGroupListener`, `StreamRemoveConsumerListener`, `StreamRemoveGroupListener`, `StreamRemoveListener`, `StreamTrimListener` listeners added for `RStream` object  
+
+Fixed - Spring Data Redis `RedissonConnection.setCommands()` method returns null  
+Fixed - continuously reconnecting to a removed slave node in cluster mode  
+Fixed - `EntryExpiredListener` isn't invoked by `RMapCache` instance in Redis Cluster 7+ and if `nameMapper` is defined  
+Fixed - `Skipped slave up ...` error is thrown in Sentinel mode if nodes use IPv6  
+Fixed - NPE is thrown when adding or removing shards in ElastiCache  
+Fixed - `RAtomicDouble`, `RAtomicLong`, `RMap`, `RScoredSortedSet`, `RSet` listeners aren't removed properly  
+Fixed - connection isn't reconnected on `WRONGPASS` Redis error  
+Fixed - connection timeout during Redisson start ignores connections amount  
+Fixed - `RSearch.search()` method doesn't execute query with aliases properly  
+Fixed - `FCALL_RO` command isn't used when `RFunction` method called with `FunctionMode.READ` parameter  
+Fixed - `IllegalReferenceCountException` is thrown when canceling a method call  
+Fixed - Redis scan cursor exceed `Long.MAX_VALUE` in AWS Elasticache  
+Fixed - internal `ServiceManager.calcSHA()` method should use UTF-8 encoding by default  
+
+### 20-Dec-2023 - 3.25.2 released
+
+Fixed - SSL connection can't be established  
+
+### 18-Dec-2023 - 3.25.1 released
+
+Improvement - JDK21 Virtual Threads compatibility  
+
+Fixed - EvictionTask keeps running even after `destroy()` method called  
+Fixed - Sprint Data Redis throws `Subscription registration timeout exceeded`  
+Fixed - Sprint Data Redis `RedisMessageListenerContainer.addMessageListener()` method hangs if called after container start  
+Fixed - NPE is thrown if `lazyInitialization = true`  
+Fixed - `PriorityQueue` methods may hang due to unreleased lock after exception  
+Fixed - `RMap.getAll()` method throws `IndexOutOfBoundsException`  
+Fixed - natMapper isn't applied to slaves and master nodes at start in Sentinel mode  
+Fixed - method invocation hangs after failover if `retryInterval = 0`  
+Fixed - transactional Map and MapCache keySet method returns inconsistent state  
+Fixed - Multilock lock method doesn't work properly with non-MILLISECONDS TimeUnit  
+
+### 05-Dec-2023 - 3.25.0 released
+Feature - RESP3 protocol support. [protocol](https://github.com/redisson/redisson/wiki/2.-Configuration#protocol) setting added  
+Feature - Spring Data Redis 3.2.0 implementation  
+Feature - `RSetCacheV2`, `RSetV2` objects with more effecient partitioning in Cluster added in [PRO](https://redisson.pro) version  
+
+Improvement - SLF4j updated to 2.0.9 version  
+
+Fixed - RFunction/RScript keys parameter accepts only String values  
+Fixed - IP address instead of hostname is used in sentinel mode with SSL connection  
+Fixed - Resources leak in `Version.logVersion()` method  
+Fixed - `RLiveObjectService.persist()` method with varargs hangs in cluster mode  
+Fixed - Redisson connection process may hang at start in some cases  
+Fixed - `EntryExpiredListener` isn't invoked by RMapCache instance in Redis Cluster 7+  
+Fixed - slave node in sentinel mode can't be recovered if it's a master node  
+Fixed - `JsonJacksonCodec` fails to serialize Throwable on Java17 (thanks to @tomjankes)  
+Fixed - `RBlockingDeque.move()` throws an exception for empty result  
+Fixed - `RScoredSortedSet.pollFirstEntries(count)` and `pollLastEntries(count)` methods return wrong result  
+Fixed - `BZMPOP` command timeout isn't applied  
+Fixed - `getBlockingDeque()`, `getDeque()`, `getPriorityDeque()`, `getPriorityBlockingDeque()` throw `NoClassDefFoundError` if JDK version < 21  
+Fixed - `RLocalCachedMap.containsKey()` method does not work properly if `storeCacheMiss = true`  
+Fixed - `RedissonRemoteService` exceptions handling (thanks to @mrmx)  
+Fixed - `RSearch.info()` method throws `NumberFormatException`  
+Fixed - `HttpSessionListener.sessionDestroyed()` method isn't called if Tomcat Session deleted by the node which didn't create it  
+Fixed - `LZ4CodecV2` isn't compatible with `LZ4Codec`  
+Fixed - `RSearch` GroupBy.reduce alias isn't applied (thanks to @arjunE1395)  
+
+### 24-Oct-2023 - 3.24.3 released
+
+Feature - Helidon 4.0 integration
+
+Fixed - `ERR invalid expire time` error is thrown during `RLock.unlock()` call if `retryAttempts = 0`  
+
+### 22-Oct-2023 - 3.24.2 released
+
+Fixed - `IllegalArgument timeout...` error is throw during Redisson shutdown  
+Fixed - Intermittent Exception when creating `RLocalCachedMap` (regression since 3.24.1)  
+Fixed - `RSearch.aggregate()` doesn't apply `withCursor()` and `sortBy()` options correctly  
+Fixed - `MOVED redirection loop detected` error should be thrown only if both source and target addresses are equal
+
+### 18-Oct-2023 - 3.24.1 released
+
+Feature - `writerRetryAttempts` and `writerRetryInterval` settings added to `MapOptions` object (thanks to @zzhlhc)  
+Feature - `RSortedSet` implements `RExpirable`  
+Feature - `RBlockingQueue.pollFromAnyWithName()` method added  
+Feature - `org.redisson.codec.LZ4CodecV2` codec based on apache commons-compress added  
+Feature - Redis Cache async methods implementation introduced in Spring 6.1.0  
+Feature - `tcpKeepAliveCount`, `tcpKeepAliveIdle`, `tcpKeepAliveInterval`, `tcpUserTimeout` settings added  
+Feature - `subscriptionTimeout` setting added  
+
+Fixed - `RedissonClient.shutdown()` method should be completed within timeout (thanks @dgolombek)  
+Fixed - `RBuckets.trySet()`, `RBuckets.set()`, `RBuckets.get()`, `RKeys.touch()`, `RKeys.unlink()`, `RKeys.delete()`, `RKeys.countExists()` methods may hang after failover in Redis cluster  
+Fixed - exceptions aren't wrapped in `CacheException` for `containsKey()`, `getAll()` and `removeAll()` methods of `JCache`  
+Fixed - Command execution timeout for command: (PING)  
+Fixed - `RBucketReactive.delete()` method doesn't work in Quarkus Native mode (thanks to @DicksengA)  
+Fixed - auto configuration with Spring Boot 2.7.x+  
+Fixed - `RSortedSet` doesn't work correctly if `NameMapper` object was specified  
+Fixed - `RPriorityQueue` has incorrect lock name if `NameMapper` object was specified  
+Fixed - `RMapCache.expireEntries()` and `expireEntry()` methods don't update `maxIdle` parameter properly  
+Fixed - non-volatile `RedisConnection.lastUsageTime` field may cause incorrect idle time calculation  
+Fixed - `attempt to unlock lock, not locked by current thread` error occurs in rare cases even if `RLock.unlock()` method called by lock owner thread  
+Fixed - `RCountDownLatch` only notifying the first async listener after countdown reaches 0 (thanks to @Sinbios)  
+Fixed - `RStream.trim()` and `trimNonStrict()` methods don't work with Redis 6.2+  
+Fixed - `RReadWriteLock.readLock().isLocked()` method returns incorrect result if acquired by writeLock owner thread  
+Fixed - `RedissonClient.getLiveObjectService()` method causes an attempt to connect to Redis if `lazyInitialization = true`  
+
+### 19-Sep-2023 - 3.23.5 released
+Feature - `failedSlaveNodeDetector` setting added to Cluster, Sentinel, Replicated, Master/Slave modes  
+Feature - module name added to redisson jar (thanks to @KrogerWalt)  
+Feature - `putAll()` method with TTL added to RMapCacheRx and RMapCacheReactive objects  
+Feature - Fallback to TCP in case of a UDP DNS truncation  
+Feature - `RMapCacheV2`, Spring `RedissonSpringCacheV2Manager` and Hibernate `RedissonRegionV2Factory` objects with more effecient partitioning in Cluster added in [PRO](https://redisson.pro) version  
+
+Fixed - NPE is thrown by `RedissonAutoConfiguration` if Spring Boot 3.1+  
+Fixed - `WeightedRoundRobinBalancer` doesn't support hostnames  
+Fixed - NPE is thrown by CommandPubSubDecoder in rare cases  
+Fixed - during connection initialization a new attempt isn't made for Busy, ClusterDown, TryAgain and Wait Redis errors  
+Fixed - `RJsonBucket.getType()` method throws NPE if type is null  
+Fixed - `IllegalStateException` is thrown if `RedisConnectionDetails` object registered in Spring Context with settings for Cluster or Sentinel  
+Fixed - `RSearch` can not create Vector field  
+Fixed - `RSearch` vector field doesn't support alias  
+
+
+### 29-Aug-2023 - 3.23.4 released
+
+Feature - methods for multiple permits support added to `RPermitExpirableSemaphore` object (thanks to @ikss)  
+Feature - `ProtobufCodec` codec added (thanks to @dumbbell-5kg)  
+Feature - `WAITAOF` command support through `BatchOptions.syncAOF()` setting  
+Feature - `bgSave()`, `scheduleBgSave()`, `save()`, `getLastSaveTime()`, `bgRewriteAOF()`, `size()` methods added to `RedisNode` object  
+
+Improvement - `RSemaphore` and `RLock` operations should have slave synchronization even if `readMode = MASTER` and `subscriptionMode = MASTER`  
+
+Fixed - wrong order call of RSearch's `FieldIndex` tag `caseSensitive()` and `separator()` settings  
+Fixed - `RedisConnectionDetails` object isn't used for Redisson configuration in Spring Boot 3.1+  
+Fixed - incorrect `slots added`,`slots removed` messages in Redis Cluster mode  
+Fixed - Tomcat Manager "Session can't be found" message should have debug level  
+Fixed - `RBoundedBlockingQueue` can't be deleted if `nameMapper` was defined  
+Fixed - `RLock` isn't unlocked after `RTransaction.commit()`  
+
+### 28-Jul-2023 - 3.23.3 released
+Feature - `TransportMode.IO_URING` added (thanks to @sgammon)  
+Feature - `LocalCachedMapOptions.useKeyEventsPattern()` setting introduced  
+
+Improvement - Long as string cache in CommandEncoder (thanks to @tomerarazy)  
+Improvement - each `AddressResolver` created by `SequentialDnsAddressResolverFactory` should share common DnsCache and DnsCnameCache instances  
+Improvement - RedisURI optimization (thanks to @ikss)  
+
+Fixed - codec errors during Quarkus native build  
+Fixed - extra subscription topic allocation by `RLocalCachedMap` object (regression since 3.23.2)  
+
+### 28-Jul-2023 - 3.23.2 released
+Feature - Micronaut 4.0 integration  
+
+Improvement - PubSub channels should be reconnected back to Slave from Master node if `SubscriptionMode = SLAVE`
+
+Fixed - Setting `retryAttempts` to 0 causes an exception (regression since 3.23.1)  
+Fixed - `RTopic` subscribes only to a single master in cluster if `__keyspace` or `__keyevent` channel is defined  
+Fixed - `SlaveConnectionPool no available Redis entries` error may arise in some cases  
+Fixed - StackOverflowError is thrown by `AggregationOptions.groupBy()` method  
+Fixed - `failedSlaveCheckInterval` value should be greater than zero before it can be applied  
+Fixed - `RedissonLocalCachedMap.putAllOperation()` method throws `ClassCastException` if `SyncStrategy = UPDATE`  
+
+### 18-Jul-2023 - 3.23.1 released
+Improvement - the scope of key event subscriptions reduced for `RLiveObjectService` object. Now it uses key-space channel  
+Improvement - the scope of key event subscriptions reduced for `RLocalCachedMap` object. Now it uses key-space channel  
+
+Fixed - codecs defined via Spring Native application.properties file can't be recognized during application run  
+Fixed - `retryAttempt` setting isn't applied during Redisson startup  
+Fixed - Quarkus 2/3 native image can't be built  
+Fixed - unknown property `quarkus.redisson.*` warnings in quarkus  
+Fixed - Redisson settings defined in Quarkus application.properties file can't be used in native mode  
+
+### 10-Jul-2023 - 3.23.0 released
+Feature - added `RBloomFilter` `contains()` and `add()` methods with element collection support  
+Feature - RMapCache and RLocalCachedMap should use sharded pubsub in Redis Cluster 7.0+  
+Feature - [lazyInitialization](https://github.com/redisson/redisson/wiki/2.-Configuration#lazyinitialization) setting added  
+Feature - `expireEntryIfNotSet()`, `expireEntries()`, `expireEntry()`, `expireEntriesIfNotSet()` methods added to `RMapCache` object  
+Feature - `MapCacheOptions` object with `removeEmptyEvictionTask()` setting introduced. Removes `RMapCache` eviction task from memory if map is empty upon entries eviction process completion  
+
+__Breaking change - RMapCache and RLocalCachedMap should use sharded pubsub in Redis Cluster 7.0+__  
+__Breaking change - RMapCache object uses MapCacheOptions object__  
+
+Improvement - `RMapCache` shouldn't emit events if no listeners added  
+
+Fixed - canceling tasks that scheduled with cron expression does not interrupt the thread (thanks to @zcxsythenew)  
+Fixed - `RExecutorService` task response should be deleted if task was canceled  
+Fixed - `RedisConnection.close()` method has private visibility  
+Fixed - `ConcurrentModificationException` occasionally thrown during batch execution  
+Fixed - `StringIndexOutOfBoundsException` is thrown if Redis port isn't defined in configuration  
+Fixed - missed methods implementation of Spring Data Redis module: `zRevRangeByLex()`, `time(TimeUnit)`, `zRemRangeByLex()`, `zLexCount()`, `rewriteConfig()`, `zRangeStoreByLex()`, `zRangeStoreRevByLex()`, `zRangeStoreByScore()`, `zRangeStoreRevByScore()`, `flushDb()`, `flushAll()`, `replicaOf()`, `replicaOfNoOne()`
+Fixed - transactional `RMap.fastRemove()` method throws `UnsupportedOperationException`  
+Fixed - `RBloomFilter` `contains()` and `add()` methods don't return accurate results if false probability is high  
+Fixed - incorrect handling "unknown command" response for `RTopic` operations  
+Fixed - `RLiveObjectService.delete(class, id)` method doesn't delete indexes  
+Fixed - `RMultimapCache` throws an exception if entry removed before expiration moment  
+Fixed - `keepPubSubOrder` setting isn't applied  
+
+### 19-Jun-2023 - 3.22.1 released
+Feature - Apache Tomcat Manager should use sharded pubsub in Redis Cluster 7.0+  
+Feature - Micronaut Session store should use sharded pubsub in Redis Cluster 7.0+  
+Feature - RClusteredScoredSortedSet object implemented  
+Feature - `maxDeletedEntryId`, `entriesAdded`, `recordedFirstEntryId` properties added to `StreamInfo` object  
+Feature - `inactive` property added to `StreamConsumer` object  
+Feature - `LocalCachedMapOptions.cacheSize = -1` should disable local cache storage  
+
+__Breaking change - Apache Tomcat Manager and Micronaut Session store now use sharded PubSub in Redis Cluster 7.0+__  
+
+Fixed - map index entry isn't deleted when `RLiveObjectService` expires  
+Fixed - `RMultimap.fastRemoveValue()` method doesn't delete entry completely if no values retain  
+Fixed - Default getCache method checks for Object class equality (thanks @agupta-hw)  
+Fixed - `RScoredSortedSet.distributedIterator()` doesn't work (regression since 3.21.0)  
+Fixed - Memory leak if `RLocalCachedMap` created with `storeMode=LOCALCACHE` and `syncStrategy=UPDATE` params  
+Fixed - wait time handling in RedissonSpinLock (thanks @vladimirkl)  
+Fixed - java.lang.ClassCastException is thrown by RDequeReactive.pollLast() and RDequeReactive.pollFirst() methods (thanks @wynn5a)  
+Fixed - `RSearch.search()` method throws "Parameters must be specified in PARAM VALUE pairs" error  
+Fixed - `RRateLimiter.setRate()` method does not behave as expected when RateType is pre_client (thanks @wynn5a)  
+Fixed - collection fields aren't deleted when `RLiveObject` expires or is deleted  
+
+### 05-Jun-2023 - 3.22.0 released
+Feature - Spring Data Redis 3.1.0 implementation  
+Feature - Spring Boot 3.1.0 support  
+Feature - `lastEntry()`, `firstEntry()`, `pollLastEntries()`, `pollFirstEntries()`, `entryIterator()`, `rankEntry()`, `revRankEntry()` methods added to `RScoredSortedSet` object  
+Feature - `RCountDownLatch`, `RLock`, `RPermitExpirableSemaphore`, `RSemaphore` objects use sharded PubSub in Redis Cluster 7.0+  
+Feature - `slavesSyncTimeout`, `commandMapper`, `sslCiphers`, `sslTrustManagerFactory`, `sslKeyManagerFactory` settings added  
+Feature - `RMultimap.fastRemoveValue()` method added  
+Feature - `allowedClasses` setting added to `SerializationCodec`  
+Feature - `entriesRead` and `makeStream` parameters added to `RStream.createGroup()` method  
+
+__Breaking change - RCountDownLatch, RLock, RPermitExpirableSemaphore, RSemaphore objects now use sharded PubSub in Redis Cluster 7.0+__  
+
+Fixed - Expired LiveObjects with RIndex annotations retain indexed data  
+Fixed - `RRingBuffer` doesn't implement `expire()`, `expireAt()`, `delete()`, `clearExpire()` methods properly  
+Fixed - `RLocalCachedMap` local cache isn't cleared after instance expiration  
+
+### 18-May-2023 - 3.21.3 released
+
+Fixed - default retryInterval isn't applied to RBatch object  
+Fixed - RBatches no longer respect the default number of retries (regression since 3.21.1)  
+
+### 17-May-2023 - 3.21.2 released
+Feature - `RBitSet.set(long[], boolean)` method added (thanks to @skasj)  
+
+Fixed - Pattern Topic messages are missed/duplicated after failover in cluster if channel starts with `__keyspace` and `__keyevent` and `subscriptionMode = SLAVE`  
+Fixed - to many pubsub topics may cause memory leak  
+Fixed - RBatches no longer respect the default number of retries (regression since 3.21.1)  
+
+### 11-May-2023 - 3.21.1 released
+
+Feature - `addIfAbsent()`, `addIfExists()`, `addIfGreater()`, `addIfLess()`, `addAll()`, `addAllIfAbsent()`, `addAllIfExist()`, `addAllIfGreater()`, `addAllIfLess()` methods added to `RSetCache` object  
+Feature - `SetAddListener`, `SetRemoveListener`, `SetRemoveRandomListener` added to `RSet` object  
+Feature - `ScoredSortedSetAddListener`, `ScoredSortedSetRemoveListener` added to `RScoredSortedSet` object  
+Feature - `MapPutListener`, `MapRemoveListener` added to `RMap` object  
+Feature - `IncrByListener` added to `RAtomicDouble` and `RAtomicLong` objects  
+Feature - `RMapCache.getAllWithTTLOnly()` method added  
+
+__Breaking change - RedissonDelayedQueue internal data format changed__  
+__Breaking change - RedissonReliableTopic internal data format changed__  
+
+Improvement - `RedissonReliableTopic` internal structure optimization  
+
+Fixed - `RReliableTopic` data loss  
+Fixed - failover isn't handled correctly in some cases  
+Fixed - `BatchOptions.retryAttempts = 0` isn't applied to `RBatch` object  
+Fixed - `RMap.keySet()` throws NPE if CompositeCodec used  
+Fixed - RediSearch NumericFilter shouldn't set exclusive range by default  
+Fixed - RediSearch NumericFilter throws NPE  
+Fixed - `RLocalCachedMap.removeListener()` method doesn't remove loca cache listeners  
+
+### 29-Apr-2023 - 3.21.0 released
+Feature - [RediSearch module support](https://github.com/redisson/redisson/wiki/9.-distributed-services/#96-redisearch-service)  
+Feature - [Tracing support](https://github.com/redisson/redisson/wiki/16.-Observability/#162-tracing)  
+Feature - `RSetCache` extends `RSet` interface  
+Feature - `RSemaphore` and `RPermitExpirableSemaphore` objects wait for sync operations completion  
+Feature - Quarkus 3 support  
+Feature - `LocalCacheUpdateListener` and `LocalCacheInvalidateListener` listeners support added to RLocalCachedMap object  
+
+Improvement - `RRateLimiter` object uses 128-bit random  
+Improvement - EVAL script cache applied to `RBatch` executed in `IN_MEMORY` mode  
+Improvement - `RMap.keySet()` method shouldn't load map values  
+Improvement - `SequentialDnsAddressResolverFactory` default concurrencyLevel set to 6  
+
+Fixed - `RMapCache.fastPut()` method doesn't clear ttl and idleTime params if entry reinserted after expiration  
+Fixed - Unable to find session error arise if Tomcat session was deleted or expired  
+Fixed - `MasterSlaveEntry.getClient()` method may throw NPE  
+Fixed - initialize Decoders LinkedHashMap with correct initial size to avoid unnecessary resizing (thanks @theigl)  
+Fixed - failover handling may cause temporary connections spike  
+Fixed - `RedissonCache.invalidate()` method breaks cache configuration  
+
+### 28-Mar-2023 - 3.20.1 released
+
+Feature - `LoadBalancer.getEntry(List<ClientConnectionsEntry>, RedisCommand<?>)` method added  
+Feature - [CommandsLoadBalancer](https://github.com/redisson/redisson/blob/master/redisson/src/main/java/org/redisson/connection/balancer/CommandsLoadBalancer.java) added  
+Feature - NodeType parameter added to ConnectionListener methods  
+
+Improvement - command should be redirected to a master node if slave node returns LOADING error  
+
+Fixed - `NameMapper` is called twice when acquiring a `RReadWriteLock`  
+Fixed - closing idle connections causes connection listener to fire  
+Fixed - `Unable to init enough connections amount!` error  
+Fixed - no retry attempts are made for `None of slaves were synced` error  
+Fixed - `READONLY You can't write against a read only replica..` is thrown after failover in sentinel mode (thanks @alexworkgit)  
+Fixed - continuously attempts of `INFO REPLICATION` command execution until attempts limit reached by RLock object after failover  
+Fixed - Node hasn't been discovered yet error isn't resolved by a new attempt for RBatch and RLock objects  
+Fixed - `RedisClusterDownException`, `RedisLoadingException`, `RedisBusyException`, `RedisTryAgainException`, `RedisWaitException` are thrown by RBatch and RLock objects even if these errors disappeared after new attempts  
+Fixed - `Unable to init enough connections amount! Only 0 of ... were initialized` error (thanks @alexworkgit)  
+Fixed - `nameMapper` isn't applied to some methods of `RSet` and `RScoredSortedSet` objects  
+Fixed - `readUnion()`, `readDiff()` and `readIntersection()` methods of `RSet` object don't use Redis slave nodes  
+
+### 01-Mar-2023 - 3.20.0 released
+Feature - new [Multi cluster mode](https://github.com/redisson/redisson/wiki/2.-Configuration/#210-multi-cluster-mode) which supports [AWS Redis Global Datastore](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Redis-Global-Datastore.html) and [Azure Redis Cache active-passive replication](https://learn.microsoft.com/en-us/azure/azure-cache-for-redis/cache-how-to-geo-replication)  
+Feature - [Proxy mode](https://github.com/redisson/redisson/wiki/2.-Configuration/#29-proxy-mode) supports [RLEC Active-Active databases](https://docs.redis.com/latest/rs/databases/active-active/get-started/)  
+Feature - [monitorIPChanges](https://github.com/redisson/redisson/wiki/2.-Configuration#monitoripchanges) setting added for replicated servers mode  
+Feature - auto-detection of unavailable master in replicated mode (thanks @nicdard)  
+
+Fixed - `RLock` can only be obtained by single redisson node if `None of slaves were synced` error occurred  
+Fixed - `RSetMultimapReactive.get()` method throws `ClassCastException`  
+Fixed - Redisson doesn't start in Spring Boot Native image  
+Fixed - `RedissonClient.shutdown(long, long, TimeUnit)` method isn't overridden by cluster, replicated and sentinel managers  
+Fixed - Node hasn't been discovered yet error isn't resolved by a new attempt for RBatch and RLock objects  
+Fixed - `RMapCache.addAndGet()` method doesn't handle Long type properly  
+Fixed - `eventLoopGroup`, `connectionListener` and `executor` settings can't be defined through YAML configuration  
+Fixed - `keySet()`, `values()`, `entrySet()` methods of `RLocalCachedMap` return empty result if `storeMode == LOCALCACHE`
+
+### 06-Feb-2023 - 3.19.3 released
+Fixed - a new attempt should be made on WAIT error during failover  
+Fixed - Kryo5Codec fails to (de)serialize Object without no-args constructor (regression since 3.19.2)  
+
+### 01-Feb-2023 - 3.19.2 released
+
+Fixed - `RLock` instance can acquire lock with previous leaseTime if it's not specified  
+Fixed - `RMap.computeAsync()` method causes deadlock if MapLoader is defined  
+Fixed - `RBoundedBlockingQueue.offer()` methods always use global codec  
+Fixed - Spring Boot `clientName` setting isn't used  
+Fixed - `connectTimeout` setting is set incorrectly if Spring Boot 2.4.0+  
+Fixed - command replies don't match if exception is thrown in CommandEncoder  
+Fixed - empty result of BLMPOP command causes IndexOutOfBoundsException  
+Fixed - canceled blocking operation isn't interrupted immediately in some cases  
+Fixed - RStream.read() and RStream.readGroup() methods are hang forever is timeout > 0 and < 1000 milliseconds  
+Fixed - `CacheLoader.loadAll()` method isn't called by `JCache.getAll()` method if readThrough=true  
+Fixed - `Kryo5Codec` Serializers don't work in GraalVM native image mode  
+Fixed - `LinkedHashMap` and `LinkedHashSet` objects can't be decoded properly by `Kryo5Codec`  
+Fixed - `NameMapper` isn't applied to `RFunction` and `RScript` objects  
+Fixed - `RFunction.callAsync()` method called with `RBatch` object throws `MOVED` errors in Redis cluster mode  
+Fixed - `RFunction.loadAndReplace()` method uses incorrect command parameters  
+Fixed - `codec`, `nettyHook`, `addressResolverGroupFactory`, `connectionListener` settings can't be defined through Quarkus or Helidon config  
+Fixed - `RFunction.load()` method uses incorrect command parameters  
+Fixed - empty `RTopic` message handling (thanks @MooRoakee)  
+
+### 06-Jan-2023 - 3.19.1 released
+Feature - `containsEach()` method added to RSet object (thanks to @slovvik)  
+Feature - `getPermits()`, `acquiredPermits()`, `setPermits()` methods added to `RPermitExpirableSemaphore` object (thanks to @kscaldef, @derekroller)
+
+__Breaking change - Kryo5Codec uses own serializators to serialize UUID, URI and Pattern objects__
+
+Fixed - `RReliableTopic` doesn't remove all expired subscribers at once  
+Fixed - `RPatternTopic` messages duplication after failover in cluster if channel starts with `__keyspace@` and `__keyevent@`  
+Fixed - `RBatch.getListMultimapCache()` method should return `RMultimapCacheAsync` interface  
+Fixed - SharedPubSub listener isn't being triggered (thanks to @MrChaos1993)  
+Fixed - `RSetCacheRx` and `RSetCacheReactive` miss `tryAdd()` method  
+Fixed - `RSetRx` and `RSetReactive` objects miss `tryAdd()` method  
+Fixed - `RBloomFilter` bitset can't be expired and deleted if `nameMapper` is used (thanks to @javed119)  
+Fixed - `RMapCacheRx` and `RMapCacheReactive` interfaces miss `addListener()` method  
+Fixed - `RMapCacheAsync` interface misses `addListenerAsync()` method  
+Fixed - `RTopicAsync.addListenerAsync()` method uses wrong generic pattern for MessageListener object  
+Fixed - `RPermitExpirableSemaphore` throws CROSSSLOT error in cluster if nameMapper is used  
+
+### 16-Dec-2022 - 3.19.0 released
+
+Feature - implementation of Spring Cache methods added in Spring 5.2  
+Feature - `entriesRead` and `lag` fields added to `StreamGroup` object  
+Feature - added [RFencedLock](https://github.com/redisson/redisson/wiki/8.-distributed-locks-and-synchronizers/#810-fenced-lock) implementation  
+Feature - [credentialsResolver](https://github.com/redisson/redisson/wiki/2.-Configuration#credentialsresolver) setting added  
+
+__Breaking change - default codec changed to Kryo5Codec__  
+
+Fixed - new Redis node isn't discovered between PubSub subscription attempts  
+Fixed - `codec`,`nettyHook`,`addressResolverGroupFactory`,`connectionListener` settings can't be defined through Micronaut config  
+Fixed - evictions metrics doesn't work for RedissonCache (thanks @Nicola Dardanis)  
+Fixed - PubSub connection isn't reused if it reached subscriptions limit before unsubscribe operation  
+Fixed - PubSub connection returns to connection pool only if subscriptions limit was reached  
+Fixed - use slf4j late-binding when logging instead of string concat (thanks @vatarasov)  
+Fixed - most of pubsub subscriptions fail to resubscribe after failover  
+Fixed - `RBatch` with `executionMode = REDIS_WRITE_ATOMIC` throws NPE in case of connection starvation  
+Fixed - `CommandDecoder.messageDecoder()` method throws NPE if `RBatch` object used with `executionMode = IN_MEMORY` (regression since 3.18.1)  
+Fixed - some scheduled tasks aren't executed (regression since 3.17.5)  
+Fixed - `RFunction` doesn't pass keys to Redis correctly (thanks @@jordanrmerrick)  
+Fixed - incorrectly reset jackson type factory (thanks @noelvo)  
+Fixed - cluster partitions parsing error isn't logged  
+
+### 30-Nov-2022 - 3.18.1 released
+
+Feature - Spring Data Redis 3.0.0 module added  
+
+Fixed - PubSub subscription in cluster sometimes doesn't apply to all nodes  
+Fixed - command replies don't match if connection pool size < 10 and at least one command failed  
+Fixed - `RLock` throws `CancellationException` continuously  
+Fixed - `None of slaves were synced` error is thrown after failover during RLock acquisition  
+Fixed - AWS Elasticache cluster failover  
+Fixed - `hRandFieldWithValues()` and `hRandField()` methods of Spring Data Redis module throw `ClassCastException`  
+Fixed - `trySetPermitsAsync()` method of RPermitExpirableSemaphore object shouldn't allow to overwrite the number of permits if value == 0 (thanks @kscaldef)  
+Fixed - `RKeys` object doesn't use `nameMapper`  
+Fixed - connection leak after master failover  
+
+### 11-Nov-2022 - 3.18.0 released
+
+Feature - Tomcat 10.1.x support  
+Feature - labels support for RTimeSeries object  
+Feature - compatibility with Spring Boot 3 (thanks @olivierboudet)  
+Feature - RxJava and Reactive interfaces for RLocalCachedMap object  
+Feature - local cache support for JsonBucket object  
+
+Improvement - StringCodec now implements JsonCodec  
+
+Fixed - `RDoubleAdder` and `RLongAdder` objects don't work with `nameMapper`  
+Fixed - `RBlockingQueue` methods should return null if negative timeout defined  
+Fixed - `RLocalCachedMap.clearLocalCacheAsync()` method shouldn't retain semaphore after invocation  
+Fixed - Spring Data Redis methods weren't implemented: `zRandMember()`, `zRandMemberWithScore()`, `zPopMin()`, `bZPopMin()`, `zPopMax()`, `bZPopMax()`, `zMScore()`, `zDiff()`, `zDiffWithScores()`, `zDiffStore()`, `zInter()`, `zInterWithScores()`, `zUnion()`, `zUnionWithScores()`, `hRandField()`, `hRandFieldWithValues()`, `copy()`, `lMove()`, `bLMove()`, `lPop()`, `rPop()`, `sMIsMember()`, `getEx()`, `getDel()`  
+Fixed - attempts to connect to the failed master after failover in cluster mode  
+Fixed - `RMapCache` `MapEntryListener` doesn't work with `nameMapper`  
+Fixed - `RJsonBucket.getKeys()` method doesn't use path parameter  
+Fixed - `RRateLimiter.getConfig().getRate()` throws NPE if it doesn't exist (thanks @Tanky-Zhang)  
+Fixed - `RTransaction` objects should be the same instances on each "get..." call  
+Fixed - `RScheduledExecutorService` cron triggers fire continuously for hours for some time zones (regression since 3.16.5)  
+Fixed - `RSortedSet.add()` throws NPE (thanks @yuwei)  
+Fixed - `RKeysReactive.getKeysByPattern()` method isn't giving all entries if downstream consumer is slow  
+Fixed - "Unable to unfreeze entry" errors in sentinel mode  
+Fixed - `JsonBucket.compareAndSet()` method with null as update value deletes whole object  
+Fixed - Redis Cluster topology scanned partially in case of DNS resolution error  
+Fixed - Slave nodes failed to pass complete initialization shouldn't be added as nodes  
+Fixed - ByteBuf leaks when one of multiple parameters can't be encoded  
+Fixed - `SearchDomainUnknownHostException` is thrown occasionally  
+
+### 2-Oct-2022 - 3.17.7 released
+
+Improvement - Failed connection ping isn't taken in account in Redis slave health check  
+
+Fixed - RScheduledExecutorService cron expression doesn't support year  
+Fixed - `replaceValues()` method of `RListMultimap` and `RSetMultimap` throws exception for empty collection  
+Fixed - RedissonBaseLock throws NPE after failover  
+Fixed - Spring Data Redis `evalsha()` method doesn't use key for Redis node routing in Cluster mode  
+Fixed - DNS change isn't detected in replicated mode  
+Fixed - `RCollectionReactive.addAll()` method is executed without subscription  
+Fixed - `RKeysAsync.countExists()` method throws errors in cluster mode  
+Fixed - Spring Data Redis reactive setIfAbsent should return `false` on error (thanks @zhuangzibin)  
+Fixed - Micronaut native image configuration  
+Fixed - RBatchReactive execution stuck forever if `useScriptCache = true`  
+Fixed - NameMapper is applied incorrectly to RBoundedBlockingQueue object  
+Fixed - incorrect IPv6 conversion  
+Fixed - Spring Boot Module ignores username parameter set via Spring Redis config  
+Fixed - SpringBoot yaml configuration parsing errors shouldn't be suppressed  
 
 ### 24-Aug-2022 - 3.17.6 released
 

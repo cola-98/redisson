@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,8 +36,8 @@ import java.util.concurrent.*;
 public class SyncRemoteProxy extends BaseRemoteProxy {
 
     public SyncRemoteProxy(CommandAsyncExecutor commandExecutor, String name, String responseQueueName,
-            ConcurrentMap<String, ResponseEntry> responses, Codec codec, String executorId, BaseRemoteService remoteService) {
-        super(commandExecutor, name, responseQueueName, responses, codec, executorId, remoteService);
+                            Codec codec, String executorId, BaseRemoteService remoteService) {
+        super(commandExecutor, name, responseQueueName, codec, executorId, remoteService);
     }
 
     public <T> T create(Class<T> remoteInterface, RemoteInvocationOptions options) {

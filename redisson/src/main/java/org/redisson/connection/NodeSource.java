@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ package org.redisson.connection;
 
 import org.redisson.client.RedisClient;
 import org.redisson.misc.RedisURI;
+
+import java.util.Objects;
 
 /**
  * 
@@ -95,6 +97,16 @@ public class NodeSource {
                 + ", entry=" + entry + "]";
     }
 
-    
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        NodeSource that = (NodeSource) o;
+        return Objects.equals(slot, that.slot) && Objects.equals(addr, that.addr) && Objects.equals(redisClient, that.redisClient) && redirect == that.redirect && Objects.equals(entry, that.entry);
+    }
 
+    @Override
+    public int hashCode() {
+        return Objects.hash(slot, addr, redisClient, redirect, entry);
+    }
 }

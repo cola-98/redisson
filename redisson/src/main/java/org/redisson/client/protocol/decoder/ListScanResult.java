@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,17 +28,17 @@ import org.redisson.client.RedisClient;
  */
 public class ListScanResult<V> implements ScanResult<V> {
 
-    private final long pos;
+    private final String pos;
     private final List<V> values;
     private RedisClient client;
 
-    public ListScanResult(long pos, List<V> values) {
+    public ListScanResult(String pos, List<V> values) {
         this.pos = pos;
         this.values = values;
     }
 
     @Override
-    public long getPos() {
+    public String getPos() {
         return pos;
     }
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,7 +49,7 @@ public class RedissonLexSortedSetReactive {
     private Publisher<String> scanIteratorReactive(final String pattern, final int count) {
         return Flux.create(new SetReactiveIterator<String>() {
             @Override
-            protected RFuture<ScanResult<Object>> scanIterator(final RedisClient client, final long nextIterPos) {
+            protected RFuture<ScanResult<Object>> scanIterator(RedisClient client, String nextIterPos) {
                 return ((RedissonScoredSortedSet<String>) instance).scanIteratorAsync(client, nextIterPos, pattern, count);
             }
         });

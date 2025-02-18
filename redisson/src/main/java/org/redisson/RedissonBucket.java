@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,9 @@ package org.redisson;
 import org.redisson.api.ObjectListener;
 import org.redisson.api.RBucket;
 import org.redisson.api.RFuture;
-import org.redisson.api.RPatternTopic;
 import org.redisson.api.listener.SetObjectListener;
+import org.redisson.api.listener.TrackingListener;
 import org.redisson.client.codec.Codec;
-import org.redisson.client.codec.StringCodec;
 import org.redisson.client.protocol.RedisCommands;
 import org.redisson.command.CommandAsyncExecutor;
 import org.redisson.misc.CompletableFutureWrapper;
@@ -46,6 +45,11 @@ public class RedissonBucket<V> extends RedissonExpirable implements RBucket<V> {
 
     public RedissonBucket(Codec codec, CommandAsyncExecutor connectionManager, String name) {
         super(codec, connectionManager, name);
+    }
+
+    public RedissonBucket(String name, Codec codec, CommandAsyncExecutor connectionManager) {
+        super(codec, connectionManager, name);
+        this.name = name;
     }
 
     @Override
@@ -193,6 +197,20 @@ public class RedissonBucket<V> extends RedissonExpirable implements RBucket<V> {
     }
 
     @Override
+    public void set(V value, Duration duration) {
+        get(setAsync(value, duration));
+    }
+
+    @Override
+    public RFuture<Void> setAsync(V value, Duration duration) {
+        if (value == null) {
+            return commandExecutor.writeAsync(getRawName(), RedisCommands.DEL_VOID, getRawName());
+        }
+
+        return commandExecutor.writeAsync(getRawName(), codec, RedisCommands.PSETEX, getRawName(), duration.toMillis(), encode(value));
+    }
+
+    @Override
     public RFuture<Boolean> trySetAsync(V value) {
         if (value == null) {
             return commandExecutor.readAsync(getRawName(), codec, RedisCommands.NOT_EXISTS, getRawName());
@@ -296,6 +314,35 @@ public class RedissonBucket<V> extends RedissonExpirable implements RBucket<V> {
     }
 
     @Override
+    public boolean setIfExists(V value, Duration duration) {
+        return get(setIfExistsAsync(value, duration));
+    }
+
+    @Override
+    public RFuture<Boolean> setIfExistsAsync(V value, Duration duration) {
+        if (value == null) {
+            throw new IllegalArgumentException("Value can't be null");
+        }
+
+        return commandExecutor.writeAsync(getRawName(), codec, RedisCommands.SET_BOOLEAN, getRawName(), encode(value), "PX", duration.toMillis(), "XX");
+    }
+
+    @Override
+    public V getAndSet(V value, Duration duration) {
+        return get(getAndSetAsync(value, duration));
+    }
+
+    @Override
+    public RFuture<V> getAndSetAsync(V value, Duration duration) {
+        return commandExecutor.evalWriteAsync(getRawName(), codec, RedisCommands.EVAL_OBJECT,
+                "local currValue = redis.call('get', KEYS[1]); "
+              + "redis.call('psetex', KEYS[1], ARGV[2], ARGV[1]); "
+              + "return currValue; ",
+             Collections.singletonList(getRawName()),
+             encode(value), duration.toMillis());
+    }
+
+    @Override
     public RFuture<V> getAndSetAsync(V value, long timeToLive, TimeUnit timeUnit) {
         return commandExecutor.evalWriteAsync(getRawName(), codec, RedisCommands.EVAL_OBJECT,
                 "local currValue = redis.call('get', KEYS[1]); "
@@ -315,32 +362,56 @@ public class RedissonBucket<V> extends RedissonExpirable implements RBucket<V> {
         if (listener instanceof SetObjectListener) {
             return addListener("__keyevent@*:set", (SetObjectListener) listener, SetObjectListener::onSet);
         }
+        if (listener instanceof TrackingListener) {
+            return addTrackingListener((TrackingListener) listener);
+        }
+
         return super.addListener(listener);
-    };
+    }
 
     @Override
     public RFuture<Integer> addListenerAsync(ObjectListener listener) {
         if (listener instanceof SetObjectListener) {
             return addListenerAsync("__keyevent@*:set", (SetObjectListener) listener, SetObjectListener::onSet);
         }
+        if (listener instanceof TrackingListener) {
+            return addTrackingListenerAsync((TrackingListener) listener);
+        }
+
         return super.addListenerAsync(listener);
     }
 
     @Override
     public void removeListener(int listenerId) {
-        RPatternTopic expiredTopic = new RedissonPatternTopic(StringCodec.INSTANCE, commandExecutor, "__keyevent@*:set");
-        expiredTopic.removeListener(listenerId);
-
+        removeTrackingListener(listenerId);
+        removeListener(listenerId, "__keyevent@*:set");
         super.removeListener(listenerId);
     }
 
     @Override
     public RFuture<Void> removeListenerAsync(int listenerId) {
-        RPatternTopic setTopic = new RedissonPatternTopic(StringCodec.INSTANCE, commandExecutor, "__keyevent@*:set");
-        RFuture<Void> f1 = setTopic.removeListenerAsync(listenerId);
-        RFuture<Void> f2 = super.removeListenerAsync(listenerId);
-        CompletableFuture<Void> f = CompletableFuture.allOf(f1.toCompletableFuture(), f2.toCompletableFuture());
-        return new CompletableFutureWrapper<>(f);
+        RFuture<Void> f1 = removeTrackingListenerAsync(listenerId);
+        RFuture<Void> f2 = removeListenerAsync(listenerId, "__keyevent@*:set");
+        return new CompletableFutureWrapper<>(CompletableFuture.allOf(f1.toCompletableFuture(), f2.toCompletableFuture()));
     }
 
+    @Override
+    public V findCommon(String name) {
+        return get(findCommonAsync(name));
+    }
+
+    @Override
+    public RFuture<V> findCommonAsync(String name) {
+        return commandExecutor.readAsync(getRawName(), codec, RedisCommands.LCS, getRawName(), mapName(name), "MINMATCHLEN", 30);
+    }
+
+    @Override
+    public long findCommonLength(String name) {
+        return get(findCommonLengthAsync(name));
+    }
+
+    @Override
+    public RFuture<Long> findCommonLengthAsync(String name) {
+        return commandExecutor.readAsync(getRawName(), codec, RedisCommands.LCS, getRawName(), mapName(name), "LEN");
+    }
 }

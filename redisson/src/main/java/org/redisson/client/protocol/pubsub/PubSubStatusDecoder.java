@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import org.redisson.client.handler.State;
 import org.redisson.client.protocol.decoder.MultiDecoder;
 
 import java.util.List;
+import java.util.Locale;
 
 /**
  * 
@@ -30,7 +31,7 @@ public class PubSubStatusDecoder implements MultiDecoder<Object> {
 
     @Override
     public PubSubStatusMessage decode(List<Object> parts, State state) {
-        PubSubType type = PubSubType.valueOf(parts.get(0).toString().toUpperCase());
+        PubSubType type = PubSubType.valueOf(parts.get(0).toString().toUpperCase(Locale.ENGLISH));
         ChannelName name = new ChannelName((byte[]) parts.get(1));
         return new PubSubStatusMessage(type, name);
     }

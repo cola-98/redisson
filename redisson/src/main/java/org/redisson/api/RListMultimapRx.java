@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -79,5 +79,21 @@ public interface RListMultimapRx<K, V> extends RMultimapRx<K, V> {
      *     multimap.
      */
     Single<List<V>> replaceValues(K key, Iterable<? extends V> values);
-    
+
+    /**
+     * Adds object event listener
+     *
+     * @see org.redisson.api.listener.MapPutListener
+     * @see org.redisson.api.listener.MapRemoveListener
+     * @see org.redisson.api.listener.ListAddListener
+     * @see org.redisson.api.listener.ListRemoveListener
+     * @see org.redisson.api.ExpiredObjectListener
+     * @see org.redisson.api.DeletedObjectListener
+     *
+     * @param listener object event listener
+     * @return listener id
+     */
+    @Override
+    Single<Integer> addListener(ObjectListener listener);
+
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import org.redisson.misc.ProxyBuilder;
 import org.redisson.misc.ProxyBuilder.Callback;
 
 import java.lang.reflect.Method;
+import java.util.concurrent.Callable;
 
 /**
  * 
@@ -34,13 +35,13 @@ public class RxProxyBuilder {
     public static <T> T create(CommandRxExecutor commandExecutor, Object instance, Class<T> clazz) {
         return create(commandExecutor, instance, null, clazz);
     }
-    
+
     public static <T> T create(CommandRxExecutor commandExecutor, Object instance, Object implementation, Class<T> clazz) {
         return ProxyBuilder.create(new Callback() {
             @Override
-            public Object execute(Method mm, Object instance, Method instanceMethod, Object[] args) {
-                Flowable<Object> flowable = commandExecutor.flowable(() -> ((RFuture<Object>) mm.invoke(instance, args)).toCompletableFuture());
-                
+            public Object execute(Callable<RFuture<Object>> callable, Method instanceMethod) {
+                Flowable<Object> flowable = commandExecutor.flowable(callable);
+
                 if (instanceMethod.getReturnType() == Completable.class) {
                     return flowable.ignoreElements();
                 }
@@ -49,7 +50,7 @@ public class RxProxyBuilder {
                 }
                 return flowable.singleElement();
             }
-        }, instance, implementation, clazz);
+        }, instance, implementation, clazz, commandExecutor.getServiceManager());
     }
     
 }

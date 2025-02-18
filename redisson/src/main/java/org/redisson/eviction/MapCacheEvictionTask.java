@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,16 +15,20 @@
  */
 package org.redisson.eviction;
 
-import java.util.Arrays;
-
 import org.redisson.RedissonObject;
 import org.redisson.api.RFuture;
+import org.redisson.client.codec.IntegerCodec;
 import org.redisson.client.codec.LongCodec;
 import org.redisson.client.protocol.RedisCommands;
 import org.redisson.command.CommandAsyncExecutor;
+import org.redisson.misc.CompletableFutureWrapper;
+
+import java.util.Arrays;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
- * 
+ *
  * @author Nikita Koksharov
  *
  */
@@ -36,9 +40,15 @@ public class MapCacheEvictionTask extends EvictionTask {
     private final String expiredChannelName;
     private final String lastAccessTimeSetName;
     private final String executeTaskOnceLatchName;
-    
-    public MapCacheEvictionTask(String name, String timeoutSetName, String maxIdleSetName, 
-            String expiredChannelName, String lastAccessTimeSetName, CommandAsyncExecutor executor) {
+    private boolean removeEmpty;
+
+    private EvictionScheduler evictionScheduler;
+
+    private String publishCommand;
+
+    public MapCacheEvictionTask(String name, String timeoutSetName, String maxIdleSetName,
+                                String expiredChannelName, String lastAccessTimeSetName, CommandAsyncExecutor executor,
+                                boolean removeEmpty, EvictionScheduler evictionScheduler, String publishCommand) {
         super(executor);
         this.name = name;
         this.timeoutSetName = timeoutSetName;
@@ -46,17 +56,20 @@ public class MapCacheEvictionTask extends EvictionTask {
         this.expiredChannelName = expiredChannelName;
         this.lastAccessTimeSetName = lastAccessTimeSetName;
         this.executeTaskOnceLatchName = RedissonObject.prefixName("redisson__execute_task_once_latch", name);
+        this.removeEmpty = removeEmpty;
+        this.evictionScheduler = evictionScheduler;
+        this.publishCommand = publishCommand;
     }
-    
+
     @Override
     String getName() {
         return name;
     }
-    
+
     @Override
-    RFuture<Integer> execute() {
+    CompletionStage<Integer> execute() {
         int latchExpireTime = Math.min(delay, 30);
-        return executor.evalWriteNoRetryAsync(name, LongCodec.INSTANCE, RedisCommands.EVAL_INTEGER,
+        RFuture<Integer> expiredFuture = executor.evalWriteNoRetryAsync(name, LongCodec.INSTANCE, RedisCommands.EVAL_INTEGER,
                 "if redis.call('setnx', KEYS[6], ARGV[4]) == 0 then "
                  + "return -1;"
               + "end;"
@@ -67,11 +80,11 @@ public class MapCacheEvictionTask extends EvictionTask {
                     + "if v ~= false then "
                         + "local t, val = struct.unpack('dLc0', v); "
                         + "local msg = struct.pack('Lc0Lc0', string.len(key), key, string.len(val), val); "
-                        + "local listeners = redis.call('publish', KEYS[4], msg); "
+                        + "local listeners = redis.call(ARGV[5], KEYS[4], msg); "
                         + "if (listeners == 0) then "
                             + "break;"
                         + "end; "
-                    + "end;"  
+                    + "end;"
                 + "end;"
                 + "for i=1, #expiredKeys1, 5000 do "
                     + "redis.call('zrem', KEYS[5], unpack(expiredKeys1, i, math.min(i+4999, table.getn(expiredKeys1)))); "
@@ -85,11 +98,11 @@ public class MapCacheEvictionTask extends EvictionTask {
                   + "if v ~= false then "
                       + "local t, val = struct.unpack('dLc0', v); "
                       + "local msg = struct.pack('Lc0Lc0', string.len(key), key, string.len(val), val); "
-                      + "local listeners = redis.call('publish', KEYS[4], msg); "
+                      + "local listeners = redis.call(ARGV[5], KEYS[4], msg); "
                       + "if (listeners == 0) then "
                           + "break;"
                       + "end; "
-                  + "end;"  
+                  + "end;"
               + "end;"
               + "for i=1, #expiredKeys2, 5000 do "
                   + "redis.call('zrem', KEYS[5], unpack(expiredKeys2, i, math.min(i+4999, table.getn(expiredKeys2)))); "
@@ -98,8 +111,26 @@ public class MapCacheEvictionTask extends EvictionTask {
                   + "redis.call('hdel', KEYS[1], unpack(expiredKeys2, i, math.min(i+4999, table.getn(expiredKeys2)))); "
               + "end; "
               + "return #expiredKeys1 + #expiredKeys2;",
-              Arrays.<Object>asList(name, timeoutSetName, maxIdleSetName, expiredChannelName, lastAccessTimeSetName, executeTaskOnceLatchName), 
-              System.currentTimeMillis(), keysLimit, latchExpireTime, 1);
+              Arrays.asList(name, timeoutSetName, maxIdleSetName, expiredChannelName, lastAccessTimeSetName, executeTaskOnceLatchName),
+              System.currentTimeMillis(), keysLimit, latchExpireTime, 1, publishCommand);
+
+        if (removeEmpty) {
+            CompletionStage<Integer> r = expiredFuture.thenCompose(removed -> {
+                RFuture<Integer> s = executor.readAsync(name, IntegerCodec.INSTANCE, RedisCommands.HLEN, name);
+                return s.thenCompose(size -> {
+                    if (size == 0) {
+                        evictionScheduler.remove(name);
+                        RFuture<Long> f = executor.writeAsync(name, LongCodec.INSTANCE, RedisCommands.DEL, name);
+                        return f.thenApply(res -> {
+                            return removed;
+                        });
+                    }
+                    return CompletableFuture.completedFuture(removed);
+                });
+            });
+            return new CompletableFutureWrapper<>(r);
+        }
+        return expiredFuture;
     }
-    
+
 }

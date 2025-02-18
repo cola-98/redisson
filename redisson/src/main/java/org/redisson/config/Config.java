@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,10 @@ import io.netty.channel.EventLoopGroup;
 import org.redisson.client.DefaultNettyHook;
 import org.redisson.client.NettyHook;
 import org.redisson.client.codec.Codec;
-import org.redisson.codec.MarshallingCodec;
-import org.redisson.connection.*;
+import org.redisson.codec.Kryo5Codec;
+import org.redisson.connection.AddressResolverGroupFactory;
+import org.redisson.connection.ConnectionListener;
+import org.redisson.connection.SequentialDnsAddressResolverFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,6 +31,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
 import java.net.URL;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -52,11 +55,11 @@ public class Config {
 
     private ReplicatedServersConfig replicatedServersConfig;
 
-    private ConnectionManager connectionManager;
-
     private int threads = 16;
 
     private int nettyThreads = 32;
+
+    private Executor nettyExecutor;
 
     private Codec codec;
 
@@ -70,7 +73,11 @@ public class Config {
 
     private long lockWatchdogTimeout = 30 * 1000;
 
+    private int lockWatchdogBatchSize = 100;
+
     private boolean checkLockSyncedSlaves = true;
+
+    private long slavesSyncTimeout = 1000;
 
     private long reliableTopicWatchdogTimeout = TimeUnit.MINUTES.toMillis(10);
 
@@ -90,18 +97,23 @@ public class Config {
 
     private boolean useThreadClassLoader = true;
 
-    private AddressResolverGroupFactory addressResolverGroupFactory = new DnsAddressResolverGroupFactory();
+    private AddressResolverGroupFactory addressResolverGroupFactory = new SequentialDnsAddressResolverFactory();
+
+    private boolean lazyInitialization;
+
+    private Protocol protocol = Protocol.RESP2;
 
     public Config() {
     }
 
     public Config(Config oldConf) {
         setNettyHook(oldConf.getNettyHook());
+        setNettyExecutor(oldConf.getNettyExecutor());
         setExecutor(oldConf.getExecutor());
 
         if (oldConf.getCodec() == null) {
             // use it by default
-            oldConf.setCodec(new MarshallingCodec());
+            oldConf.setCodec(new Kryo5Codec());
         }
 
         setConnectionListener(oldConf.getConnectionListener());
@@ -112,7 +124,9 @@ public class Config {
         setUseScriptCache(oldConf.isUseScriptCache());
         setKeepPubSubOrder(oldConf.isKeepPubSubOrder());
         setLockWatchdogTimeout(oldConf.getLockWatchdogTimeout());
+        setLockWatchdogBatchSize(oldConf.getLockWatchdogBatchSize());
         setCheckLockSyncedSlaves(oldConf.isCheckLockSyncedSlaves());
+        setSlavesSyncTimeout(oldConf.getSlavesSyncTimeout());
         setNettyThreads(oldConf.getNettyThreads());
         setThreads(oldConf.getThreads());
         setCodec(oldConf.getCodec());
@@ -121,6 +135,8 @@ public class Config {
         setTransportMode(oldConf.getTransportMode());
         setAddressResolverGroupFactory(oldConf.getAddressResolverGroupFactory());
         setReliableTopicWatchdogTimeout(oldConf.getReliableTopicWatchdogTimeout());
+        setLazyInitialization(oldConf.isLazyInitialization());
+        setProtocol(oldConf.getProtocol());
 
         if (oldConf.getSingleServerConfig() != null) {
             setSingleServerConfig(new SingleServerConfig(oldConf.getSingleServerConfig()));
@@ -137,10 +153,6 @@ public class Config {
         if (oldConf.getReplicatedServersConfig() != null) {
             setReplicatedServersConfig(new ReplicatedServersConfig(oldConf.getReplicatedServersConfig()));
         }
-        if (oldConf.getConnectionManager() != null) {
-            useCustomServers(oldConf.getConnectionManager());
-        }
-
     }
 
     public NettyHook getNettyHook() {
@@ -159,10 +171,10 @@ public class Config {
     }
 
     /**
-     * Redis data codec. Default is MarshallingCodec codec
+     * Redis data codec. Default is Kryo5Codec codec
      *
      * @see org.redisson.client.codec.Codec
-     * @see org.redisson.codec.MarshallingCodec
+     * @see org.redisson.codec.Kryo5Codec
      * 
      * @param codec object
      * @return config
@@ -255,27 +267,6 @@ public class Config {
 
     protected void setReplicatedServersConfig(ReplicatedServersConfig replicatedServersConfig) {
         this.replicatedServersConfig = replicatedServersConfig;
-    }
-
-    /**
-     * Returns the connection manager if supplied via
-     * {@link #useCustomServers(ConnectionManager)}
-     * 
-     * @return ConnectionManager
-     */
-    ConnectionManager getConnectionManager() {
-        return connectionManager;
-    }
-
-    /**
-     * This is an extension point to supply custom connection manager.
-     * 
-     * @see ReplicatedConnectionManager on how to implement a connection
-     *      manager.
-     * @param connectionManager for supply
-     */
-    public void useCustomServers(ConnectionManager connectionManager) {
-        this.connectionManager = connectionManager;
     }
 
     /**
@@ -373,6 +364,10 @@ public class Config {
         return sentinelServersConfig != null;
     }
 
+    public boolean isSingleConfig() {
+        return singleServerConfig != null;
+    }
+
     public int getThreads() {
         return threads;
     }
@@ -460,9 +455,29 @@ public class Config {
         return nettyThreads;
     }
 
+    public Executor getNettyExecutor() {
+        return nettyExecutor;
+    }
+
+    /**
+     * Use external Executor for Netty.
+     * <p>
+     * For example, it allows to define <code>Executors.newVirtualThreadPerTaskExecutor()</code>
+     * to use virtual threads.
+     * <p>
+     * The caller is responsible for closing the Executor.
+     *
+     * @param nettyExecutor netty executor object
+     * @return config
+     */
+    public Config setNettyExecutor(Executor nettyExecutor) {
+        this.nettyExecutor = nettyExecutor;
+        return this;
+    }
+
     /**
      * Use external ExecutorService. ExecutorService processes 
-     * all listeners of <code>RTopic</code>, 
+     * all listeners of <code>RTopic</code>, <code>RPatternTopic</code>
      * <code>RRemoteService</code> invocation handlers  
      * and <code>RExecutorService</code> tasks.
      * <p>
@@ -525,6 +540,24 @@ public class Config {
 
     public long getLockWatchdogTimeout() {
         return lockWatchdogTimeout;
+    }
+
+
+    /**
+     * This parameter is only used if lock has been acquired without leaseTimeout parameter definition.
+     * Defines amount of locks utilized in a single lock watchdog execution.
+     * <p>
+     * Default is 100
+     *
+     * @param lockWatchdogBatchSize amount of locks used by a single lock watchdog execution
+     * @return config
+     */
+    public Config setLockWatchdogBatchSize(int lockWatchdogBatchSize) {
+        this.lockWatchdogBatchSize = lockWatchdogBatchSize;
+        return this;
+    }
+    public int getLockWatchdogBatchSize() {
+        return lockWatchdogBatchSize;
     }
 
     /**
@@ -834,6 +867,60 @@ public class Config {
      */
     public Config setConnectionListener(ConnectionListener connectionListener) {
         this.connectionListener = connectionListener;
+        return this;
+    }
+
+    public long getSlavesSyncTimeout() {
+        return slavesSyncTimeout;
+    }
+
+    /**
+     * Defines slaves synchronization timeout applied to each operation of {@link org.redisson.api.RLock},
+     * {@link org.redisson.api.RSemaphore}, {@link org.redisson.api.RPermitExpirableSemaphore} objects.
+     * <p>
+     * Default is <code>1000</code> milliseconds.
+     *
+     * @param timeout timeout in milliseconds
+     * @return config
+     */
+    public Config setSlavesSyncTimeout(long timeout) {
+        this.slavesSyncTimeout = timeout;
+        return this;
+    }
+
+    public boolean isLazyInitialization() {
+        return lazyInitialization;
+    }
+
+    /**
+     * Defines whether Redisson connects to Redis only when
+     * first Redis call is made and not during Redisson instance creation.
+     * <p>
+     * Default value is <code>false</code>
+     *
+     * @param lazyInitialization <code>true</code> connects to Redis only when first Redis call is made,
+     *                           <code>false</code> connects to Redis during Redisson instance creation.
+     * @return config
+     */
+    public Config setLazyInitialization(boolean lazyInitialization) {
+        this.lazyInitialization = lazyInitialization;
+        return this;
+    }
+
+    public Protocol getProtocol() {
+        return protocol;
+    }
+
+    /**
+     * Defines Redis protocol version.
+     * <p>
+     * Default value is <code>RESP2</code>
+     *
+     * @param protocol Redis protocol version
+     * @return config
+     */
+    public Config setProtocol(Protocol protocol) {
+        this.protocol = protocol;
         return this;
     }
 }

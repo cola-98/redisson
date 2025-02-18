@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.JsonType;
 import org.redisson.api.RJsonBucket;
+import org.redisson.api.RType;
+import org.redisson.client.codec.StringCodec;
 import org.redisson.codec.JacksonCodec;
 
 import java.math.BigDecimal;
@@ -12,7 +14,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class RedissonJsonBucketTest extends BaseTest {
+public class RedissonJsonBucketTest extends DockerRedisStackTest {
 
     public static class NestedType {
 
@@ -71,16 +73,32 @@ public class RedissonJsonBucketTest extends BaseTest {
     }
 
     @Test
+    public void testCompareAndSetUpdate() {
+        RJsonBucket<String> b = redisson.getJsonBucket("test", StringCodec.INSTANCE);
+        b.set("{\"foo\": false, \"bar\":true}");
+        boolean s = b.compareAndSet("$.foo", false, null);
+        assertThat(s).isTrue();
+        boolean result = b.isExists();
+        assertThat(result).isTrue();
+    }
+
+    @Test
     public void testType() {
         RJsonBucket<TestType> al = redisson.getJsonBucket("test", new JacksonCodec<>(TestType.class));
         TestType t = new TestType();
         t.setName("name1");
         al.set(t);
 
+        assertThat(redisson.getKeys().getType("test")).isEqualTo(RType.JSON);
+
         JsonType s = al.getType();
         assertThat(s).isEqualTo(JsonType.OBJECT);
         JsonType s1 = al.getType("name");
         assertThat(s1).isEqualTo(JsonType.STRING);
+
+        RJsonBucket<TestType> al2 = redisson.getJsonBucket("test2", new JacksonCodec<>(TestType.class));
+        assertThat(al2.getType()).isNull();
+        assertThat(al2.getType("*")).isNull();
     }
 
     @Test
@@ -333,6 +351,20 @@ public class RedissonJsonBucketTest extends BaseTest {
         assertThat(nt3.getValues()).isEqualTo(nt2.getValues());
     }
 
+    @Test
+    public void testKeys() {
+        RJsonBucket<String> jb = redisson.getJsonBucket("test", StringCodec.INSTANCE);
+        jb.set("{\"a\":false, \"nested\": {\"a\": {\"b\":2, \"c\": 1, \"d\": 3}}}");
+
+        List<String> keys1 = jb.getKeys();
+        assertThat(keys1).containsExactly("a", "nested");
+
+        List<String> keys3 = jb.getKeys("nested.a");
+        assertThat(keys3).containsExactly("b", "c", "d");
+
+        List<List<String>> keys5 = jb.getKeysMulti("$.nested.a");
+        assertThat(keys5).isEqualTo(Arrays.asList(Arrays.asList("b", "c", "d")));
+    }
 
     @Test
     public void testCompareAndSet() {
@@ -423,6 +455,18 @@ public class RedissonJsonBucketTest extends BaseTest {
         t.setName("name1");
         al.set(t);
         assertThat(al.delete()).isTrue();
+    }
+
+    @Test
+    public void testMerge() {
+        RJsonBucket<TestType> al = redisson.getJsonBucket("test", new JacksonCodec<>(TestType.class));
+        TestType t = new TestType();
+        t.setName("name1");
+        al.set(t);
+
+        al.merge("$.name", "name2");
+        t = al.get();
+        assertThat(t.getName()).isEqualTo("name2");
     }
 
     @Test

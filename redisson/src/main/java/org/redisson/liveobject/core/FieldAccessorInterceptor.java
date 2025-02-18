@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package org.redisson.liveobject.core;
 
 import java.lang.reflect.Method;
+import java.util.Locale;
 
 import org.redisson.api.RMap;
 import org.redisson.liveobject.misc.ClassUtils;
@@ -40,7 +41,7 @@ public class FieldAccessorInterceptor {
             @FieldValue("liveObjectLiveMap") RMap<?, ?> map
     ) throws Exception {
         if (args.length >= 1 && String.class.isAssignableFrom(args[0].getClass())) {
-            String name = ((String) args[0]).substring(0, 1).toUpperCase() + ((String) args[0]).substring(1);
+            String name = ((String) args[0]).substring(0, 1).toUpperCase(Locale.ENGLISH) + ((String) args[0]).substring(1);
             if ("get".equals(method.getName()) && args.length == 1) {
                 try {
                     return me.getClass().getMethod("get" + name).invoke(me);

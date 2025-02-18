@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,9 +45,12 @@ public class RedisNodes<N extends Node> implements NodesGroup<N> {
     final ConnectionManager connectionManager;
     final CommandAsyncExecutor commandExecutor;
 
-    public RedisNodes(ConnectionManager connectionManager, CommandAsyncExecutor commandExecutor) {
+    final ServiceManager serviceManager;
+
+    public RedisNodes(ConnectionManager connectionManager, ServiceManager serviceManager, CommandAsyncExecutor commandExecutor) {
         this.connectionManager = connectionManager;
         this.commandExecutor = commandExecutor;
+        this.serviceManager = serviceManager;
     }
 
     @Override
@@ -56,12 +59,12 @@ public class RedisNodes<N extends Node> implements NodesGroup<N> {
         RedisURI addr = new RedisURI(address);
         for (MasterSlaveEntry masterSlaveEntry : entries) {
             if (masterSlaveEntry.getAllEntries().isEmpty() 
-                    && RedisURI.compare(masterSlaveEntry.getClient().getAddr(), addr)) {
+                    && addr.equals(masterSlaveEntry.getClient().getAddr())) {
                 return (N) new RedisClientEntry(masterSlaveEntry.getClient(), commandExecutor, NodeType.MASTER);
             }
 
             for (ClientConnectionsEntry entry : masterSlaveEntry.getAllEntries()) {
-                if (RedisURI.compare(entry.getClient().getAddr(), addr) 
+                if (addr.equals(entry.getClient().getAddr())
                         && entry.getFreezeReason() != FreezeReason.MANAGER) {
                     return (N) new RedisClientEntry(entry.getClient(), commandExecutor, entry.getNodeType());
                 }
@@ -136,7 +139,7 @@ public class RedisNodes<N extends Node> implements NodesGroup<N> {
             Thread.currentThread().interrupt();
         }
 
-        if (System.currentTimeMillis() - time >= connectionManager.getConfig().getConnectTimeout()) {
+        if (System.currentTimeMillis() - time >= connectionManager.getServiceManager().getConfig().getConnectTimeout()) {
             for (Entry<RedisConnection, RFuture<String>> entry : result.entrySet()) {
                 entry.getKey().closeAsync();
             }
@@ -171,12 +174,12 @@ public class RedisNodes<N extends Node> implements NodesGroup<N> {
 
     @Override
     public int addConnectionListener(ConnectionListener connectionListener) {
-        return connectionManager.getConnectionEventsHub().addListener(connectionListener);
+        return serviceManager.getConnectionEventsHub().addListener(connectionListener);
     }
 
     @Override
     public void removeConnectionListener(int listenerId) {
-        connectionManager.getConnectionEventsHub().removeListener(listenerId);
+        serviceManager.getConnectionEventsHub().removeListener(listenerId);
     }
 
 }

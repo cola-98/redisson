@@ -2,12 +2,14 @@ package org.redisson;
 
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RBitSet;
+import org.springframework.util.StopWatch;
 
 import java.util.BitSet;
+import java.util.Random;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class RedissonBitSetTest extends BaseTest {
+public class RedissonBitSetTest extends RedisDockerTest {
 
     @Test
     public void testUnsigned() {
@@ -89,6 +91,20 @@ public class RedissonBitSetTest extends BaseTest {
         bs.clear();
         bs.set(0);
         assertThat(bs.length()).isEqualTo(1);
+        
+        // no exception happened, but return is unexpected.
+        bs.clear();
+        bs.set(0, 2);
+        bs.set(9);
+        bs.clear(9, 10);
+        assertThat(bs.length()).isEqualTo(2);
+        
+        // cause exception
+        bs.clear();
+        bs.set(7);
+        bs.set(9);
+        bs.clear(9, 10);
+        assertThat(bs.length()).isEqualTo(8);
     }
 
     @Test
@@ -123,6 +139,15 @@ public class RedissonBitSetTest extends BaseTest {
 
         bs = redisson.getBitSet("testbitset");
         assertThat(bs.toString()).isEqualTo("{1, 10}");
+
+        RBitSet bs2 = redisson.getBitSet("testbitset2");
+        bs2.set(new long[]{1L,3L,5L,7L}, true);
+        bs2 = redisson.getBitSet("testbitset2");
+        assertThat(bs2.toString()).isEqualTo("{1, 3, 5, 7}");
+
+        bs2.set(new long[]{3L,5L}, false);
+        bs2 = redisson.getBitSet("testbitset2");
+        assertThat(bs2.toString()).isEqualTo("{1, 7}");
     }
 
     @Test
@@ -185,5 +210,16 @@ public class RedissonBitSetTest extends BaseTest {
         assertThat(bs1.size()).isEqualTo(16);
     }
 
+    @Test
+    public void testGetWithIndexes() {
+        RBitSet bitset = redisson.getBitSet("testbitset");
+        
+        bitset.set(4, 10);
+        boolean[] result = bitset.get(2, 4, 7, 8);
+        assertThat(result[0]).isFalse();
+        assertThat(result[1]).isTrue();
+        assertThat(result[2]).isTrue();
+        assertThat(result[3]).isTrue();
+    }
 
 }

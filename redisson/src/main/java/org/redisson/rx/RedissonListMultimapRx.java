@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 package org.redisson.rx;
 
 import org.redisson.RedissonList;
-import org.redisson.RedissonListMultimap;
+import org.redisson.api.RListMultimap;
 import org.redisson.api.RListRx;
 
 /**
@@ -29,16 +29,16 @@ import org.redisson.api.RListRx;
 public class RedissonListMultimapRx<K, V> {
 
     private final CommandRxExecutor commandExecutor;
-    private final RedissonListMultimap<K, V> instance;
+    private final RListMultimap<K, V> instance;
     
-    public RedissonListMultimapRx(RedissonListMultimap<K, V> instance, CommandRxExecutor commandExecutor) {
+    public RedissonListMultimapRx(RListMultimap<K, V> instance, CommandRxExecutor commandExecutor) {
         this.instance = instance;
         this.commandExecutor = commandExecutor;
     }
 
     public RListRx<V> get(K key) {
         RedissonList<V> list = (RedissonList<V>) instance.get(key);
-        return RxProxyBuilder.create(commandExecutor, instance, 
+        return RxProxyBuilder.create(commandExecutor, list,
                 new RedissonListRx<V>(list), RListRx.class);
     }
 

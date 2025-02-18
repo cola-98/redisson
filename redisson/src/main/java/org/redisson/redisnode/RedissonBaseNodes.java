@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,10 +52,10 @@ public class RedissonBaseNodes implements BaseRedisNodes {
         Collection<MasterSlaveEntry> entries = connectionManager.getEntrySet();
         List<T> result = new ArrayList<>();
         for (MasterSlaveEntry masterSlaveEntry : entries) {
-            if (masterSlaveEntry.getAllEntries().isEmpty()
-                    && type == NodeType.MASTER) {
+            if (type == NodeType.MASTER) {
                 RedisNode entry = new RedisNode(masterSlaveEntry.getClient(), commandExecutor, NodeType.MASTER);
                 result.add((T) entry);
+                continue;
             }
 
             for (ClientConnectionsEntry slaveEntry : masterSlaveEntry.getAllEntries()) {
@@ -74,13 +74,12 @@ public class RedissonBaseNodes implements BaseRedisNodes {
         RedisURI addr = new RedisURI(address);
         for (MasterSlaveEntry masterSlaveEntry : entries) {
             if (nodeType == NodeType.MASTER
-                    && masterSlaveEntry.getAllEntries().isEmpty()
-                        && RedisURI.compare(masterSlaveEntry.getClient().getAddr(), addr)) {
+                    && addr.equals(masterSlaveEntry.getClient().getAddr())) {
                 return new RedisNode(masterSlaveEntry.getClient(), commandExecutor, NodeType.MASTER);
             }
 
             for (ClientConnectionsEntry entry : masterSlaveEntry.getAllEntries()) {
-                if (RedisURI.compare(entry.getClient().getAddr(), addr)
+                if (addr.equals(entry.getClient().getAddr())
                         && entry.getFreezeReason() != ClientConnectionsEntry.FreezeReason.MANAGER) {
                     return new RedisNode(entry.getClient(), commandExecutor, entry.getNodeType());
                 }

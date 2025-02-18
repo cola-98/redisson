@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,13 +15,13 @@
  */
 package org.redisson.tomcat;
 
+import org.redisson.client.protocol.Decoder;
+import org.redisson.client.protocol.Encoder;
+
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-
-import org.redisson.client.protocol.Decoder;
-import org.redisson.client.protocol.Encoder;
 
 /**
  * 
@@ -35,15 +35,15 @@ public class AttributesPutAllMessage extends AttributeMessage {
     public AttributesPutAllMessage() {
     }
 
-    public AttributesPutAllMessage(String nodeId, String sessionId, Map<String, Object> attrs, Encoder encoder) throws IOException {
-        super(nodeId, sessionId);
+    public AttributesPutAllMessage(RedissonSessionManager redissonSessionManager, String sessionId, Map<String, Object> attrs, Encoder encoder) throws Exception {
+        super(redissonSessionManager.getNodeId(), sessionId);
         if (attrs != null) {
-        	this.attrs = new HashMap<String, byte[]>();
-        	for (Entry<String, Object> entry: attrs.entrySet()) {
-            	this.attrs.put(entry.getKey(), toByteArray(encoder, entry.getValue()));
-        	}
+            this.attrs = new HashMap<>();
+            for (Entry<String, Object> entry: attrs.entrySet()) {
+                this.attrs.put(entry.getKey(), toByteArray(encoder, entry.getValue()));
+            }
         } else {
-        	this.attrs = null;
+            this.attrs = null;
         }
     }
 

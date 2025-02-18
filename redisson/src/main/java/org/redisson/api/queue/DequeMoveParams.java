@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,35 +20,41 @@ package org.redisson.api.queue;
  * @author Nikita Koksharov
  *
  */
-public class DequeMoveParams {
+public class DequeMoveParams implements DequeMoveDestination {
 
     public enum Direction {LEFT, RIGHT};
 
-    private Direction sourceDirection;
+    private final Direction sourceDirection;
     private Direction destDirection;
     private String destName;
 
-    public Direction getSourceDirection() {
-        return sourceDirection;
+    DequeMoveParams(Direction direction) {
+        sourceDirection = direction;
     }
 
-    public void setSourceDirection(Direction sourceDirection) {
-        this.sourceDirection = sourceDirection;
+    @Override
+    public DequeMoveArgs addFirstTo(String name) {
+        destDirection = Direction.LEFT;
+        destName = name;
+        return this;
+    }
+
+    @Override
+    public DequeMoveArgs addLastTo(String name) {
+        destDirection = Direction.RIGHT;
+        destName = name;
+        return this;
+    }
+
+    public Direction getSourceDirection() {
+        return sourceDirection;
     }
 
     public Direction getDestDirection() {
         return destDirection;
     }
 
-    public void setDestDirection(Direction destDirection) {
-        this.destDirection = destDirection;
-    }
-
     public String getDestName() {
         return destName;
-    }
-
-    public void setDestName(String destName) {
-        this.destName = destName;
     }
 }

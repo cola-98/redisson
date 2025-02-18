@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,10 @@
 package org.redisson.connection;
 
 import io.netty.channel.socket.DatagramChannel;
-import io.netty.resolver.dns.DnsAddressResolverGroup;
-import io.netty.resolver.dns.DnsServerAddressStreamProvider;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.resolver.dns.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 
@@ -26,11 +28,27 @@ import io.netty.resolver.dns.DnsServerAddressStreamProvider;
  *
  */
 public class DnsAddressResolverGroupFactory implements AddressResolverGroupFactory {
-    
+
+    static final Logger log = LoggerFactory.getLogger(DnsAddressResolverGroupFactory.class);
+
     @Override
     public DnsAddressResolverGroup create(Class<? extends DatagramChannel> channelType,
-            DnsServerAddressStreamProvider nameServerProvider) {
-        return new DnsAddressResolverGroup(channelType, nameServerProvider);
+                                          Class<? extends SocketChannel> socketChannelType,
+                                          DnsServerAddressStreamProvider nameServerProvider) {
+        DnsNameResolverBuilder dnsResolverBuilder = new DnsNameResolverBuilder();
+        try {
+            dnsResolverBuilder.getClass().getMethod("socketChannelType", Class.class, boolean.class);
+            dnsResolverBuilder.socketChannelType(socketChannelType, true);
+        } catch (NoSuchMethodException e) {
+            log.warn("DNS TCP fallback on UDP query timeout disabled. Upgrade Netty to 4.1.105 or higher.");
+            dnsResolverBuilder.socketChannelType(socketChannelType);
+        }
+        dnsResolverBuilder.channelType(channelType)
+                .nameServerProvider(nameServerProvider)
+                .resolveCache(new DefaultDnsCache())
+                .cnameCache(new DefaultDnsCnameCache());
+
+        return new DnsAddressResolverGroup(dnsResolverBuilder);
     }
 
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,32 +22,55 @@ import org.redisson.api.StreamMessageId;
  * @author Nikita Koksharov
  *
  */
-public class StreamTrimParams {
+public final class StreamTrimParams implements StreamTrimStrategyArgs<StreamTrimArgs>,
+                                         StreamTrimArgs,
+                                         StreamTrimLimitArgs<StreamTrimArgs> {
 
-    private int maxLen;
-    private StreamMessageId minId;
-    private int limit;
+    Integer maxLen;
+    StreamMessageId minId;
+    int limit;
 
-    public int getMaxLen() {
-        return maxLen;
+    StreamTrimParams(int threshold) {
+        this.maxLen = threshold;
     }
-    public void setMaxLen(int maxLen) {
-        this.maxLen = maxLen;
+
+    StreamTrimParams(StreamMessageId minId) {
+        this.minId = minId;
+    }
+
+    @Override
+    public StreamTrimLimitArgs<StreamTrimArgs> maxLen(int threshold) {
+        this.maxLen = threshold;
+        return this;
+    }
+
+    @Override
+    public StreamTrimLimitArgs<StreamTrimArgs> minId(StreamMessageId messageId) {
+        this.minId = messageId;
+        return this;
+    }
+
+    @Override
+    public StreamTrimArgs noLimit() {
+        this.limit = 0;
+        return this;
+    }
+
+    @Override
+    public StreamTrimArgs limit(int size) {
+        this.limit = size;
+        return this;
+    }
+
+    public Integer getMaxLen() {
+        return maxLen;
     }
 
     public StreamMessageId getMinId() {
         return minId;
     }
-    public void setMinId(StreamMessageId minId) {
-        this.minId = minId;
-    }
 
     public int getLimit() {
         return limit;
     }
-
-    public void setLimit(int limit) {
-        this.limit = limit;
-    }
-
 }

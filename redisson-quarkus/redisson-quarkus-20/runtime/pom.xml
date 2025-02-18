@@ -4,13 +4,13 @@
     <parent>
         <groupId>org.redisson</groupId>
         <artifactId>redisson-quarkus-20-parent</artifactId>
-        <version>3.17.7-SNAPSHOT</version>
+        <version>3.44.1-SNAPSHOT</version>
         <relativePath>../</relativePath>
     </parent>
 
     <artifactId>redisson-quarkus-20</artifactId>
 
-    <name>Redisson/Quarkus v2.0.x runtime</name>
+    <name>Redisson Quarkus v2.x.x runtime</name>
 
     <dependencies>
       <dependency>
@@ -32,6 +32,13 @@
           <artifactId>netty-transport-native-kqueue</artifactId>
           <classifier>osx-x86_64</classifier>
       </dependency>
+        <dependency>
+            <groupId>io.netty.incubator</groupId>
+            <artifactId>netty-incubator-transport-native-io_uring</artifactId>
+            <version>0.0.25.Final</version>
+            <classifier>linux-x86_64</classifier>
+        </dependency>
+
 
       <dependency>
           <groupId>org.redisson</groupId>
@@ -50,6 +57,12 @@
               <scope>provided</scope>
           </dependency>
 
+          <dependency>
+              <groupId>com.github.ben-manes.caffeine</groupId>
+              <artifactId>caffeine</artifactId>
+              <version>3.1.8</version>
+          </dependency>
+
     </dependencies>
 
     <build>
@@ -57,7 +70,7 @@
         <plugin>
             <groupId>com.mycila</groupId>
             <artifactId>license-maven-plugin</artifactId>
-            <version>4.1</version>
+            <version>4.5</version>
             <configuration>
                 <basedir>${basedir}</basedir>
                 <header>${basedir}/../../../header.txt</header>

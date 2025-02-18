@@ -1,19 +1,26 @@
 package org.redisson;
 
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RList;
 import org.redisson.api.RListMultimap;
+import org.redisson.api.listener.ListAddListener;
+import org.redisson.api.listener.ListRemoveListener;
+import org.redisson.api.listener.MapPutListener;
+import org.redisson.api.listener.MapRemoveListener;
 import org.redisson.client.codec.StringCodec;
 
 import java.io.Serializable;
+import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class RedissonListMultimapTest extends BaseTest {
+public class RedissonListMultimapTest extends RedisDockerTest {
 
     public static class SimpleKey implements Serializable {
 
@@ -121,10 +128,10 @@ public class RedissonListMultimapTest extends BaseTest {
     public void testSizeInMemory() {
         RListMultimap<String, String> list = redisson.getListMultimap("test");
         list.put("1", "2");
-        assertThat(list.sizeInMemory()).isEqualTo(160);
+        assertThat(list.sizeInMemory()).isEqualTo(88);
 
         list.put("1", "3");
-        assertThat(list.sizeInMemory()).isEqualTo(166);
+        assertThat(list.sizeInMemory()).isEqualTo(96);
     }
 
     @Test
@@ -221,17 +228,24 @@ public class RedissonListMultimapTest extends BaseTest {
     
     @Test
     public void testRemoveAll() {
-        RListMultimap<SimpleKey, SimpleValue> map = redisson.getListMultimap("test1");
-        map.put(new SimpleKey("0"), new SimpleValue("1"));
-        map.put(new SimpleKey("0"), new SimpleValue("1"));
-        map.put(new SimpleKey("0"), new SimpleValue("2"));
-        map.put(new SimpleKey("0"), new SimpleValue("3"));
+        RListMultimap<String, String> map = redisson.getListMultimap("test1");
+        map.put("0", "1");
+        map.put("0", "1");
+        map.put("0", "2");
+        map.put("0", "3");
 
-        List<SimpleValue> values = map.removeAll(new SimpleKey("0"));
-        assertThat(values).containsExactly(new SimpleValue("1"), new SimpleValue("1"), new SimpleValue("2"), new SimpleValue("3"));
+        RList<String> set = map.get("0");
+        set.removeAll(Arrays.asList("4", "5"));
+        assertThat(map.size()).isEqualTo(4);
+
+        set.removeAll(Arrays.asList("3"));
+        assertThat(map.size()).isEqualTo(3);
+
+        List<String> values = map.removeAll("0");
+        assertThat(values).containsExactly("1", "1", "2");
         assertThat(map.size()).isZero();
 
-        List<SimpleValue> values2 = map.removeAll(new SimpleKey("0"));
+        List<String> values2 = map.removeAll("0");
         assertThat(values2).isEmpty();
     }
 
@@ -287,7 +301,45 @@ public class RedissonListMultimapTest extends BaseTest {
         assertThat(map.get(1).range(1, 3)).containsExactly(2, 3, 4);
     }
 
-    
+    @Test
+    public void testListener() {
+        testWithParams(redisson -> {
+            Queue<Integer> nfs = new ConcurrentLinkedQueue<>();
+            RListMultimap<Integer, Integer> map = redisson.getListMultimap("test1");
+            map.addListener(new MapPutListener() {
+                @Override
+                public void onPut(String name) {
+                    nfs.add(1);
+                }
+            });
+            map.addListener(new MapRemoveListener() {
+                @Override
+                public void onRemove(String name) {
+                    nfs.add(2);
+                }
+            });
+            map.addListener(new ListAddListener() {
+                @Override
+                public void onListAdd(String name) {
+                    nfs.add(3);
+                }
+            });
+            map.addListener(new ListRemoveListener() {
+                @Override
+                public void onListRemove(String name) {
+                    nfs.add(4);
+                }
+            });
+            map.put(1, 5);
+            map.put(1, 8);
+            map.remove(1, 5);
+            map.remove(1, 8);
+
+            Awaitility.waitAtMost(Duration.ofSeconds(1))
+                    .untilAsserted(() -> assertThat(nfs).containsExactlyInAnyOrder(1, 3, 3, 2, 4, 4));
+        }, NOTIFY_KEYSPACE_EVENTS, "Ehl");
+    }
+
     @Test
     public void testRemove() {
         RListMultimap<SimpleKey, SimpleValue> map = redisson.getListMultimap("test1");
@@ -362,6 +414,32 @@ public class RedissonListMultimapTest extends BaseTest {
 
         List<SimpleValue> allValues = map.getAll(new SimpleKey("0"));
         assertThat(allValues).containsExactlyElementsOf(values);
+
+        List<SimpleValue> oldValues2 = map.replaceValues(new SimpleKey("0"), Collections.emptyList());
+        assertThat(oldValues2).containsExactlyElementsOf(values);
+
+        List<SimpleValue> vals = map.getAll(new SimpleKey("0"));
+        assertThat(vals).isEmpty();
+    }
+
+    @Test
+    public void testFastReplaceValues() {
+        RListMultimap<SimpleKey, SimpleValue> map = redisson.getListMultimap("testFastReplace");
+
+        map.put(new SimpleKey("0"), new SimpleValue("1"));
+        map.put(new SimpleKey("3"), new SimpleValue("4"));
+
+        List<SimpleValue> values = Arrays.asList(new SimpleValue("11"), new SimpleValue("12"), new SimpleValue("12"));
+
+        map.fastReplaceValues(new SimpleKey("0"), values);
+
+        List<SimpleValue> allValues = map.getAll(new SimpleKey("0"));
+        assertThat(allValues).containsExactlyElementsOf(values);
+
+        map.fastReplaceValues(new SimpleKey("0"), Collections.emptyList());
+
+        List<SimpleValue> vals = map.getAll(new SimpleKey("0"));
+        assertThat(vals).isEmpty();
     }
 
     @Test

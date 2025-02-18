@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,13 @@ package org.redisson.api;
 
 import org.redisson.api.map.MapLoader;
 import org.redisson.api.map.MapWriter;
+import org.redisson.api.map.event.MapEntryListener;
 
+import java.time.Duration;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 /**
  * <p>Map-based cache with ability to set TTL for each entry via
@@ -251,11 +255,22 @@ public interface RMapCacheAsync<K, V> extends RMapAsync<K, V> {
     RFuture<Boolean> fastPutIfAbsentAsync(K key, V value, long ttl, TimeUnit ttlUnit, long maxIdleTime, TimeUnit maxIdleUnit);
 
     /**
-     * Updates time to live and max idle time of specified entry by key.
-     * Entry expires when specified time to live or max idle time was reached.
+     * If the specified key is not already associated
+     * with a value, attempts to compute its value using the given mapping function and enters it into this map .
      * <p>
-     * Returns <code>false</code> if entry already expired or doesn't exist,
-     * otherwise returns <code>true</code>.
+     * Stores value mapped by key with specified time to live.
+     * Entry expires after specified time to live.
+     *
+     * @param key - map key
+     * @param ttl - time to live for key\value entry.
+     *              If <code>0</code> then stores infinitely.
+     * @param mappingFunction the mapping function to compute a value
+     * @return current associated value
+     */
+    RFuture<V> computeIfAbsentAsync(K key, Duration ttl, Function<? super K, ? extends V> mappingFunction);
+
+    /**
+     * Use {@link #expireEntryAsync(Object, Duration, Duration)} instead.
      *
      * @param key - map key
      * @param ttl - time to live for key\value entry.
@@ -271,7 +286,48 @@ public interface RMapCacheAsync<K, V> extends RMapAsync<K, V> {
      * @return returns <code>false</code> if entry already expired or doesn't exist,
      *         otherwise returns <code>true</code>.
      */
+    @Deprecated
     RFuture<Boolean> updateEntryExpirationAsync(K key, long ttl, TimeUnit ttlUnit, long maxIdleTime, TimeUnit maxIdleUnit);
+
+    /**
+     * Updates time to live and max idle time of specified entry by key.
+     * Entry expires when specified time to live or max idle time was reached.
+     * <p>
+     * Returns <code>false</code> if entry already expired or doesn't exist,
+     * otherwise returns <code>true</code>.
+     *
+     * @param key - map key
+     * @param ttl - time to live for key\value entry.
+     *              If <code>0</code> then time to live doesn't affect entry expiration.
+     * @param maxIdleTime - max idle time for key\value entry.
+     *              If <code>0</code> then max idle time doesn't affect entry expiration.
+     * <p>
+     * if <code>maxIdleTime</code> and <code>ttl</code> params are equal to <code>0</code>
+     * then entry stores infinitely.
+     *
+     * @return returns <code>false</code> if entry already expired or doesn't exist,
+     *         otherwise returns <code>true</code>.
+     */
+    RFuture<Boolean> expireEntryAsync(K key, Duration ttl, Duration  maxIdleTime);
+
+    /**
+     * Updates time to live and max idle time of specified entries by keys.
+     * Entries expires when specified time to live or max idle time was reached.
+     * <p>
+     * Returns amount of updated entries.
+     *
+     * @param keys map keys
+     * @param ttl time to live for key\value entries.
+     *              If <code>0</code> then time to live doesn't affect entry expiration.
+     * @param maxIdleTime max idle time for key\value entries.
+     *              If <code>0</code> then max idle time doesn't affect entry expiration.
+     * <p>
+     * if <code>maxIdleTime</code> and <code>ttl</code> params are equal to <code>0</code>
+     * then entries are stored infinitely.
+     *
+     * @return amount of updated entries.
+     */
+    RFuture<Integer> expireEntriesAsync(Set<K> keys, Duration ttl, Duration maxIdleTime);
 
     /**
      * Returns the value mapped by defined <code>key</code> or {@code null} if value is absent.
@@ -279,13 +335,27 @@ public interface RMapCacheAsync<K, V> extends RMapAsync<K, V> {
      * If map doesn't contain value for specified key and {@link MapLoader} is defined
      * then value will be loaded in read-through mode.
      * <p>
-     * Idle time of entry is not taken into account.
+     * NOTE: Idle time of entry is not taken into account.
      * Entry last access time isn't modified if map limited by size.
      *
      * @param key the key
      * @return the value mapped by defined <code>key</code> or {@code null} if value is absent
      */
     RFuture<V> getWithTTLOnlyAsync(K key);
+
+    /**
+     * Returns map slice contained the mappings with defined <code>keys</code>.
+     * <p>
+     * If map doesn't contain value/values for specified key/keys and {@link MapLoader} is defined
+     * then value/values will be loaded in read-through mode.
+     * <p>
+     * NOTE: Idle time of entry is not taken into account.
+     * Entry last access time isn't modified if map limited by size.
+     *
+     * @param keys map keys
+     * @return Map slice
+     */
+    RFuture<Map<K, V>> getAllWithTTLOnlyAsync(Set<K> keys);
 
     /**
      * Returns the number of entries in cache.
@@ -305,5 +375,18 @@ public interface RMapCacheAsync<K, V> extends RMapAsync<K, V> {
      *          -1 if the key exists but has no associated expire.
      */
     RFuture<Long> remainTimeToLiveAsync(K key);
-    
+
+    /**
+     * Adds map entry listener
+     *
+     * @see org.redisson.api.map.event.EntryCreatedListener
+     * @see org.redisson.api.map.event.EntryUpdatedListener
+     * @see org.redisson.api.map.event.EntryRemovedListener
+     * @see org.redisson.api.map.event.EntryExpiredListener
+     *
+     * @param listener - entry listener
+     * @return listener id
+     */
+    RFuture<Integer> addListenerAsync(MapEntryListener listener);
+
 }

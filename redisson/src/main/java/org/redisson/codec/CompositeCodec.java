@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,8 @@ import org.redisson.client.codec.BaseCodec;
 import org.redisson.client.codec.Codec;
 import org.redisson.client.protocol.Decoder;
 import org.redisson.client.protocol.Encoder;
+
+import java.util.Objects;
 
 /**
  * 
@@ -85,41 +87,17 @@ public class CompositeCodec implements Codec {
     }
 
     @Override
-    @SuppressWarnings("AvoidInlineConditionals")
-    public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + ((mapKeyCodec == null) ? 0 : mapKeyCodec.hashCode());
-        result = prime * result + ((mapValueCodec == null) ? 0 : mapValueCodec.hashCode());
-        result = prime * result + ((valueCodec == null) ? 0 : valueCodec.hashCode());
-        return result;
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        CompositeCodec that = (CompositeCodec) o;
+        return Objects.equals(mapKeyCodec, that.mapKeyCodec)
+                && Objects.equals(mapValueCodec, that.mapValueCodec)
+                    && Objects.equals(valueCodec, that.valueCodec);
     }
 
     @Override
-    public boolean equals(Object obj) {
-        if (this == obj)
-            return true;
-        if (obj == null)
-            return false;
-        if (getClass() != obj.getClass())
-            return false;
-        CompositeCodec other = (CompositeCodec) obj;
-        if (mapKeyCodec == null) {
-            if (other.mapKeyCodec != null)
-                return false;
-        } else if (!mapKeyCodec.equals(other.mapKeyCodec))
-            return false;
-        if (mapValueCodec == null) {
-            if (other.mapValueCodec != null)
-                return false;
-        } else if (!mapValueCodec.equals(other.mapValueCodec))
-            return false;
-        if (valueCodec == null) {
-            if (other.valueCodec != null)
-                return false;
-        } else if (!valueCodec.equals(other.valueCodec))
-            return false;
-        return true;
+    public int hashCode() {
+        return Objects.hash(mapKeyCodec, mapValueCodec, valueCodec);
     }
-
 }

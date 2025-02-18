@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import org.redisson.client.RedisConnection;
 import org.redisson.config.MasterSlaveServersConfig;
 import org.redisson.connection.ClientConnectionsEntry;
 import org.redisson.connection.ConnectionManager;
+import org.redisson.connection.ConnectionsHolder;
 import org.redisson.connection.MasterSlaveEntry;
 
 /**
@@ -34,8 +35,12 @@ public class SlaveConnectionPool extends ConnectionPool<RedisConnection> {
         super(config, connectionManager, masterSlaveEntry);
     }
 
-    protected int getMinimumIdleSize(ClientConnectionsEntry entry) {
-        return config.getSlaveConnectionMinimumIdleSize();
+    @Override
+    protected ConnectionsHolder<RedisConnection> getConnectionHolder(ClientConnectionsEntry entry, boolean trackChanges) {
+        if (trackChanges) {
+            return entry.getTrackedConnectionsHolder();
+        }
+        return entry.getConnectionsHolder();
     }
 
 }

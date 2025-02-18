@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,7 +59,7 @@ public class MapReactiveIterator<K, V, M> implements Consumer<FluxSink<M>> {
             }
 
             @Override
-            protected RFuture<ScanResult<Object>> scanIterator(RedisClient client, long nextIterPos) {
+            protected RFuture<ScanResult<Object>> scanIterator(RedisClient client, String nextIterPos) {
                 return MapReactiveIterator.this.scanIterator(client, nextIterPos);
             }
         });
@@ -80,7 +80,7 @@ public class MapReactiveIterator<K, V, M> implements Consumer<FluxSink<M>> {
         };
     }
 
-    public RFuture<ScanResult<Object>> scanIterator(RedisClient client, long nextIterPos) {
+    public RFuture<ScanResult<Object>> scanIterator(RedisClient client, String nextIterPos) {
         return (RFuture<ScanResult<Object>>) (Object) map.scanIteratorAsync(map.getRawName(), client, nextIterPos, pattern, count);
     }
 

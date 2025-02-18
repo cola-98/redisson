@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,13 +17,14 @@ package org.redisson.cache;
 
 import java.io.Serializable;
 import java.util.Arrays;
+import java.util.Objects;
 
 /**
  * 
  * @author Nikita Koksharov
  *
  */
-public class CacheKey implements Serializable {
+public final class CacheKey implements Serializable {
     
     private static final long serialVersionUID = 5790732187795028243L;
     
@@ -37,27 +38,18 @@ public class CacheKey implements Serializable {
     public byte[] getKeyHash() {
         return keyHash;
     }
-    
+
     @Override
-    public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + Arrays.hashCode(keyHash);
-        return result;
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        CacheKey cacheKey = (CacheKey) o;
+        return Objects.deepEquals(keyHash, cacheKey.keyHash);
     }
 
     @Override
-    public boolean equals(Object obj) {
-        if (this == obj)
-            return true;
-        if (obj == null)
-            return false;
-        if (getClass() != obj.getClass())
-            return false;
-        CacheKey other = (CacheKey) obj;
-        if (!Arrays.equals(keyHash, other.keyHash))
-            return false;
-        return true;
+    public int hashCode() {
+        return Arrays.hashCode(keyHash);
     }
 
     @Override

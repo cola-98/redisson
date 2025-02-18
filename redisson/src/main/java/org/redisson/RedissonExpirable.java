@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,12 +36,12 @@ import org.redisson.command.CommandAsyncExecutor;
  */
 abstract class RedissonExpirable extends RedissonObject implements RExpirable {
 
-    RedissonExpirable(CommandAsyncExecutor connectionManager, String name) {
-        super(connectionManager, name);
+    RedissonExpirable(CommandAsyncExecutor commandAsyncExecutor, String name) {
+        super(commandAsyncExecutor, name);
     }
 
-    RedissonExpirable(Codec codec, CommandAsyncExecutor connectionManager, String name) {
-        super(codec, connectionManager, name);
+    RedissonExpirable(Codec codec, CommandAsyncExecutor commandAsyncExecutor, String name) {
+        super(codec, commandAsyncExecutor, name);
     }
 
     @Override

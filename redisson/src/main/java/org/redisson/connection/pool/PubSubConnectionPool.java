@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,15 +16,14 @@
 package org.redisson.connection.pool;
 
 import org.redisson.client.RedisPubSubConnection;
-import org.redisson.client.protocol.RedisCommand;
 import org.redisson.client.protocol.RedisCommands;
 import org.redisson.config.MasterSlaveServersConfig;
 import org.redisson.connection.ClientConnectionsEntry;
 import org.redisson.connection.ConnectionManager;
+import org.redisson.connection.ConnectionsHolder;
 import org.redisson.connection.MasterSlaveEntry;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 
 /**
  * Connection pool for Publish / Subscribe
@@ -39,41 +38,16 @@ public class PubSubConnectionPool extends ConnectionPool<RedisPubSubConnection> 
     }
 
     public CompletableFuture<RedisPubSubConnection> get() {
-        return get(RedisCommands.PUBLISH);
+        return get(RedisCommands.SUBSCRIBE, false);
     }
-    
-    @Override
-    protected RedisPubSubConnection poll(ClientConnectionsEntry entry, RedisCommand<?> command) {
-        return entry.pollSubscribeConnection();
+
+    public CompletableFuture<RedisPubSubConnection> get(ClientConnectionsEntry entry) {
+        return get(RedisCommands.SUBSCRIBE, entry, false);
     }
 
     @Override
-    protected int getMinimumIdleSize(ClientConnectionsEntry entry) {
-        return config.getSubscriptionConnectionMinimumIdleSize();
+    protected ConnectionsHolder<RedisPubSubConnection> getConnectionHolder(ClientConnectionsEntry entry, boolean trackChanges) {
+        return entry.getPubSubConnectionsHolder();
     }
 
-    @Override
-    protected CompletionStage<RedisPubSubConnection> connect(ClientConnectionsEntry entry) {
-        return entry.connectPubSub();
-    }
-
-    @Override
-    protected CompletableFuture<Void> acquireConnection(ClientConnectionsEntry entry, RedisCommand<?> command) {
-        return entry.acquireSubscribeConnection();
-    }
-    
-    @Override
-    protected void releaseConnection(ClientConnectionsEntry entry) {
-        entry.releaseSubscribeConnection();
-    }
-
-    @Override
-    protected void releaseConnection(ClientConnectionsEntry entry, RedisPubSubConnection conn) {
-        entry.releaseSubscribeConnection(conn);
-    }
-
-    @Override
-    protected boolean changeUsage() {
-        return false;
-    }
 }

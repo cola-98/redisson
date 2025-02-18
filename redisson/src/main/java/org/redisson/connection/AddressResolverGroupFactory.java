@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,17 +15,20 @@
  */
 package org.redisson.connection;
 
-import java.net.InetSocketAddress;
-
 import io.netty.channel.socket.DatagramChannel;
+import io.netty.channel.socket.SocketChannel;
 import io.netty.resolver.AddressResolverGroup;
 import io.netty.resolver.dns.DnsServerAddressStreamProvider;
+
+import java.net.InetSocketAddress;
 
 /**
  * Created by hasaadon on 15/02/2018.
  */
 public interface AddressResolverGroupFactory {
 
-    AddressResolverGroup<InetSocketAddress> create(Class<? extends DatagramChannel> channelType, DnsServerAddressStreamProvider nameServerProvider);
+    AddressResolverGroup<InetSocketAddress> create(Class<? extends DatagramChannel> channelType,
+                                                   Class<? extends SocketChannel> socketChannelType,
+                                                   DnsServerAddressStreamProvider nameServerProvider);
 
 }

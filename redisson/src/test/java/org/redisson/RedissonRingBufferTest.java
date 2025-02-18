@@ -8,7 +8,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RRingBuffer;
 
-public class RedissonRingBufferTest extends BaseTest {
+public class RedissonRingBufferTest extends RedisDockerTest {
 
     @Test
     public void testSetCapacity() {
@@ -29,6 +29,28 @@ public class RedissonRingBufferTest extends BaseTest {
         }
         assertThat(buffer2).containsExactly(7, 8, 9);
 
+    }
+
+    @Test
+    public void testReSetCapacity() {
+        RRingBuffer<Integer> buffer = redisson.getRingBuffer("test");
+        buffer.trySetCapacity(3);
+        for (int i = 0; i < 3; i++) {
+            buffer.add(i);
+        }
+
+        assertThat(buffer).containsExactly(0, 1, 2);
+        assertThat(buffer.size()).isEqualTo(3);
+
+        // new capacity greater than list's length, not trim
+        buffer.setCapacity(5);
+        assertThat(buffer).containsExactly(0, 1, 2);
+        assertThat(buffer.size()).isEqualTo(3);
+
+        // new capacity less than list's length, trim size to new capacity
+        buffer.setCapacity(1);
+        assertThat(buffer).containsExactly(2);
+        assertThat(buffer.size()).isEqualTo(1);
     }
 
     @Test

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 package org.redisson.reactive;
 
 import org.redisson.RedissonList;
-import org.redisson.RedissonListMultimapCache;
+import org.redisson.api.RListMultimap;
 import org.redisson.api.RListReactive;
 
 /**
@@ -28,10 +28,10 @@ import org.redisson.api.RListReactive;
  */
 public class RedissonListMultimapCacheReactive<K, V> {
 
-    private final RedissonListMultimapCache<K, V> instance;
+    private final RListMultimap<K, V> instance;
     private final CommandReactiveExecutor commandExecutor;
 
-    public RedissonListMultimapCacheReactive(RedissonListMultimapCache<K, V> instance, CommandReactiveExecutor commandExecutor) {
+    public RedissonListMultimapCacheReactive(RListMultimap<K, V> instance, CommandReactiveExecutor commandExecutor) {
         this.instance = instance;
         this.commandExecutor = commandExecutor;
     }

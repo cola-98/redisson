@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import java.io.ObjectOutputStream;
 import java.math.BigInteger;
 import java.security.MessageDigest;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -38,7 +39,7 @@ import java.util.function.Supplier;
  *
  * @param <V> value type
  */
-public class RedissonPriorityQueue<V> extends RedissonList<V> implements RPriorityQueue<V> {
+public class RedissonPriorityQueue<V> extends BaseRedissonList<V> implements RPriorityQueue<V> {
 
     public static class BinarySearchResult<V> {
 
@@ -79,7 +80,7 @@ public class RedissonPriorityQueue<V> extends RedissonList<V> implements RPriori
         this.commandExecutor = commandExecutor;
 
         comparatorHolder = redisson.getBucket(getComparatorKeyName(), StringCodec.INSTANCE);
-        lock = redisson.getLock("redisson_sortedset_lock:{" + getRawName() + "}");
+        lock = redisson.getLock(getLockName());
     }
 
     public RedissonPriorityQueue(Codec codec, CommandAsyncExecutor commandExecutor, String name, RedissonClient redisson) {
@@ -87,7 +88,11 @@ public class RedissonPriorityQueue<V> extends RedissonList<V> implements RPriori
         this.commandExecutor = commandExecutor;
 
         comparatorHolder = redisson.getBucket(getComparatorKeyName(), StringCodec.INSTANCE);
-        lock = redisson.getLock("redisson_sortedset_lock:{" + getRawName() + "}");
+        lock = redisson.getLock(getLockName());
+    }
+
+    private String getLockName() {
+        return prefixName("redisson_sortedset_lock", getName());
     }
 
     private void loadComparator() {
@@ -268,19 +273,35 @@ public class RedissonPriorityQueue<V> extends RedissonList<V> implements RPriori
         return wrapLockedAsync(RedisCommands.LPOP, getRawName());
     }
 
-    protected <T> RFuture<V> wrapLockedAsync(RedisCommand<T> command, Object... params) {
+    protected final <T> RFuture<V> wrapLockedAsync(RedisCommand<T> command, Object... params) {
         return wrapLockedAsync(() -> {
             return commandExecutor.writeAsync(getRawName(), codec, command, params);
         });
     }
 
     protected final <T, R> RFuture<R> wrapLockedAsync(Supplier<RFuture<R>> callable) {
-        long threadId = Thread.currentThread().getId();
-        CompletionStage<R> f = lock.lockAsync(threadId).thenCompose(r -> {
+        long randomId = getServiceManager().generateValue();
+        CompletionStage<R> f = lock.lockAsync(randomId).thenCompose(r -> {
             RFuture<R> callback = callable.get();
-            return callback.thenCompose(value -> {
-                return lock.unlockAsync(threadId).thenApply(res -> value);
-            });
+            return callback.handle((value, ex) -> {
+                CompletableFuture<R> result = new CompletableFuture<>();
+                lock.unlockAsync(randomId)
+                        .whenComplete((r2, ex2) -> {
+                            if (ex2 != null) {
+                                if (ex != null) {
+                                    ex2.addSuppressed(ex);
+                                }
+                                result.completeExceptionally(ex2);
+                                return;
+                            }
+                            if (ex != null) {
+                                result.completeExceptionally(ex);
+                                return;
+                            }
+                            result.complete(value);
+                        });
+                return result;
+            }).thenCompose(ff -> ff);
         });
         return new CompletableFutureWrapper<>(f);
     }
@@ -319,6 +340,10 @@ public class RedissonPriorityQueue<V> extends RedissonList<V> implements RPriori
 
     @Override
     public boolean trySetComparator(Comparator<? super V> comparator) {
+        if (comparator.getClass().isSynthetic()) {
+            throw new IllegalArgumentException("Synthetic classes aren't allowed");
+        }
+
         String className = comparator.getClass().getName();
         String comparatorSign = className + ":" + calcClassSign(className);
 

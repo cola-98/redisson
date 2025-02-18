@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,7 +33,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -59,8 +58,8 @@ public class RedissonExecutorRemoteService extends RedissonRemoteService {
     private List<TaskSuccessListener> successListeners;
 
     public RedissonExecutorRemoteService(Codec codec, String name,
-                                         CommandAsyncExecutor commandExecutor, String executorId, ConcurrentMap<String, ResponseEntry> responses) {
-        super(codec, name, commandExecutor, executorId, responses);
+                                         CommandAsyncExecutor commandExecutor, String executorId) {
+        super(codec, name, commandExecutor, executorId);
     }
 
     @Override
@@ -71,7 +70,7 @@ public class RedissonExecutorRemoteService extends RedissonRemoteService {
                     + "redis.call('zrem', KEYS[2], ARGV[1]); "
 
                     + "redis.call('zrem', KEYS[7], ARGV[1]); "
-                    + "redis.call('zrem', KEYS[7], 'ff' .. ARGV[1]);"
+                    + "redis.call('zrem', KEYS[7], 'ff:' .. ARGV[1]);"
 
                     + "redis.call('hdel', KEYS[1], ARGV[1]); "
                     + "if redis.call('decr', KEYS[3]) == 0 then "
@@ -98,7 +97,7 @@ public class RedissonExecutorRemoteService extends RedissonRemoteService {
         startedListeners.forEach(l -> l.onStarted(request.getId()));
 
         if (taskTimeout > 0) {
-            commandExecutor.getConnectionManager().getGroup().schedule(() -> {
+            commandExecutor.getServiceManager().newTimeout(t -> {
                 cancelRequestFuture.complete(new RemoteServiceCancelRequest(true, false));
             }, taskTimeout, TimeUnit.MILLISECONDS);
         }
@@ -118,7 +117,7 @@ public class RedissonExecutorRemoteService extends RedissonRemoteService {
             }
             RemoteServiceResponse response = new RemoteServiceResponse(request.getId(), e.getCause());
             responsePromise.complete(response);
-            log.error("Can't execute: " + request, e);
+            log.error("Can't execute: {}", request, e);
         }
 
         if (cancelRequestFuture != null) {

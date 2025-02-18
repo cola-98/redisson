@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -70,7 +70,7 @@ public class RedissonReactiveStreamCommands extends RedissonBaseReactive impleme
             params.add(k);
             params.add(command.getGroupName());
             params.add(command.getNewOwner());
-            params.add(Objects.requireNonNull(command.getOptions().getIdleTime()).toMillis());
+            params.add(Objects.requireNonNull(command.getOptions().getMinIdleTime()).toMillis());
             params.addAll(Arrays.asList(command.getOptions().getIdsAsStringArray()));
             params.add("JUSTID");
 
@@ -95,7 +95,7 @@ public class RedissonReactiveStreamCommands extends RedissonBaseReactive impleme
             params.add(k);
             params.add(command.getGroupName());
             params.add(command.getNewOwner());
-            params.add(Objects.requireNonNull(command.getOptions().getIdleTime()).toMillis());
+            params.add(Objects.requireNonNull(command.getOptions().getMinIdleTime()).toMillis());
             params.addAll(Arrays.asList(command.getOptions().getIdsAsStringArray()));
 
             Mono<Map<StreamMessageId, Map<byte[], byte[]>>> m = write(k, ByteArrayCodec.INSTANCE, RedisCommands.XCLAIM, params.toArray());

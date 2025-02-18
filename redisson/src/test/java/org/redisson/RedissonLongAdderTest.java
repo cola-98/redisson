@@ -4,7 +4,21 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RLongAdder;
 
-public class RedissonLongAdderTest extends BaseTest {
+public class RedissonLongAdderTest extends RedisDockerTest {
+
+    @Test
+    public void testSumStability() {
+        for (int i = 0; i < 100; i++) {
+            testSum();
+        }
+    }
+
+    @Test
+    public void testResetStability() {
+        for (int i = 0; i < 100; i++) {
+            testReset();
+        }
+    }
 
     @Test
     public void testSum() {
@@ -19,6 +33,10 @@ public class RedissonLongAdderTest extends BaseTest {
         Assertions.assertThat(adder1.sum()).isEqualTo(7);
         Assertions.assertThat(adder2.sum()).isEqualTo(7);
         Assertions.assertThat(adder3.sum()).isEqualTo(7);
+
+        adder1.destroy();
+        adder2.destroy();
+        adder3.destroy();
     }
     
     @Test
@@ -36,6 +54,10 @@ public class RedissonLongAdderTest extends BaseTest {
         Assertions.assertThat(adder1.sum()).isZero();
         Assertions.assertThat(adder2.sum()).isZero();
         Assertions.assertThat(adder3.sum()).isZero();
+
+        adder1.destroy();
+        adder2.destroy();
+        adder3.destroy();
     }
     
 }

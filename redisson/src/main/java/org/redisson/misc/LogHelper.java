@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,9 +37,9 @@ public final class LogHelper {
     
     public static String toString(RedisCommand<?> command, Object... params) {
         if (RedisCommands.AUTH.equals(command)) {
-            return command + ", params: (password masked)";
+            return "command: " + command + ", params: (password masked)";
         }
-        return command + ", params: " + LogHelper.toString(params);
+        return "command: " + command + ", params: " + LogHelper.toString(params);
     }
     
     public static String toString(Object object) {
@@ -56,7 +56,7 @@ public final class LogHelper {
             if (RedisCommands.AUTH.equals(cd.getCommand())) {
                 return cd.getCommand() + ", params: (password masked)";
             }
-            return cd.getCommand() + ", promise: " + cd.getPromise() + ", params: " + LogHelper.toString(cd.getParams());
+            return cd.getCommand() + ", params: " + LogHelper.toString(cd.getParams()) + ", promise: " + cd.getPromise();
         } else if (object instanceof ByteBuf) {
             final ByteBuf byteBuf = (ByteBuf) object;
             // can't be used due to Buffer Leak error is appeared in log

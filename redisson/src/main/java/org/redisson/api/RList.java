@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,11 +15,11 @@
  */
 package org.redisson.api;
 
+import org.redisson.api.mapreduce.RCollectionMapReduce;
+
 import java.util.Iterator;
 import java.util.List;
 import java.util.RandomAccess;
-
-import org.redisson.api.mapreduce.RCollectionMapReduce;
 
 /**
  * Distributed and concurrent implementation of {@link java.util.List}
@@ -151,6 +151,7 @@ public interface RList<V> extends List<V>, RExpirable, RListAsync<V>, RSortable<
     /**
      * Adds object event listener
      *
+     * @see org.redisson.api.listener.TrackingListener
      * @see org.redisson.api.ExpiredObjectListener
      * @see org.redisson.api.DeletedObjectListener
      * @see org.redisson.api.listener.ListAddListener

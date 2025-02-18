@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,9 @@
 package org.redisson;
 
 import org.redisson.client.protocol.RedisCommand;
+import org.redisson.connection.MasterSlaveEntry;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -28,16 +30,18 @@ import java.util.List;
  */
 public interface SlotCallback<T, R> {
 
-    default RedisCommand<T> createCommand(List<String> params) {
+    default RedisCommand<T> createCommand(List<Object> params) {
         return null;
     }
 
-    default Object[] createParams(List<String> params) {
+    default Object[] createKeys(MasterSlaveEntry entry, List<Object> params) {
         return params.toArray();
     }
 
-    void onSlotResult(T result);
+    default Object[] createParams(List<Object> params) {
+        return params.toArray();
+    }
 
-    R onFinish();
+    R onResult(Collection<T> result);
 
 }

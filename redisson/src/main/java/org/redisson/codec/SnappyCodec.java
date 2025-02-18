@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ public class SnappyCodec extends BaseCodec {
     private final Codec innerCodec;
 
     public SnappyCodec() {
-        this(new MarshallingCodec());
+        this(new Kryo5Codec());
     }
 
     public SnappyCodec(Codec innerCodec) {
@@ -56,7 +56,7 @@ public class SnappyCodec extends BaseCodec {
     }
 
     public SnappyCodec(ClassLoader classLoader) {
-        this(new MarshallingCodec(classLoader));
+        this(new Kryo5Codec(classLoader));
     }
     
     public SnappyCodec(ClassLoader classLoader, SnappyCodec codec) throws ReflectiveOperationException {

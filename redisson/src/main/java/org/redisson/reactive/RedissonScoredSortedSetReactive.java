@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import org.redisson.api.RFuture;
 import org.redisson.api.RScoredSortedSetAsync;
 import org.redisson.client.RedisClient;
 import org.redisson.client.codec.Codec;
+import org.redisson.client.protocol.ScoredEntry;
 import reactor.core.publisher.Flux;
 
 import java.util.concurrent.Callable;
@@ -72,7 +73,7 @@ public class RedissonScoredSortedSetReactive<V>  {
     private Flux<V> scanIteratorReactive(String pattern, int count) {
         return Flux.create(new SetReactiveIterator<V>() {
             @Override
-            protected RFuture<ScanResult<Object>> scanIterator(RedisClient client, long nextIterPos) {
+            protected RFuture<ScanResult<Object>> scanIterator(RedisClient client, String nextIterPos) {
                 return ((RedissonScoredSortedSet<V>) instance).scanIteratorAsync(client, nextIterPos, pattern, count);
             }
         });
@@ -96,6 +97,31 @@ public class RedissonScoredSortedSetReactive<V>  {
 
     public Flux<V> iterator(String pattern, int count) {
         return scanIteratorReactive(pattern, count);
+    }
+
+    private Flux<ScoredEntry<V>> entryScanIteratorReactive(String pattern, int count) {
+        return Flux.create(new SetReactiveIterator<ScoredEntry<V>>() {
+            @Override
+            protected RFuture<ScanResult<Object>> scanIterator(RedisClient client, String nextIterPos) {
+                return ((RedissonScoredSortedSet<V>) instance).entryScanIteratorAsync(client, nextIterPos, pattern, count);
+            }
+        });
+    }
+
+    public Flux<ScoredEntry<V>> entryIterator() {
+        return entryScanIteratorReactive(null, 10);
+    }
+
+    public Flux<ScoredEntry<V>> entryIterator(String pattern) {
+        return entryScanIteratorReactive(pattern, 10);
+    }
+
+    public Flux<ScoredEntry<V>> entryIterator(int count) {
+        return entryScanIteratorReactive(null, count);
+    }
+
+    public Flux<ScoredEntry<V>> entryIterator(String pattern, int count) {
+        return entryScanIteratorReactive(pattern, count);
     }
 
 }

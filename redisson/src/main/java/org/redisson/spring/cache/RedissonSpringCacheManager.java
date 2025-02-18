@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.redisson.api.RMap;
 import org.redisson.api.RMapCache;
 import org.redisson.api.RedissonClient;
+import org.redisson.api.map.event.MapEntryListener;
 import org.redisson.client.codec.Codec;
 import org.springframework.beans.factory.BeanDefinitionStoreException;
 import org.springframework.beans.factory.InitializingBean;
@@ -268,7 +269,10 @@ public class RedissonSpringCacheManager implements CacheManager, ResourceLoaderA
         if (oldCache != null) {
             cache = oldCache;
         } else {
-            map.setMaxSize(config.getMaxSize());
+            map.setMaxSize(config.getMaxSize(), config.getEvictionMode());
+            for (MapEntryListener listener : config.getListeners()) {
+                map.addListener(listener);
+            }
         }
         return cache;
     }
@@ -298,12 +302,13 @@ public class RedissonSpringCacheManager implements CacheManager, ResourceLoaderA
 
         Resource resource = resourceLoader.getResource(configLocation);
         try {
-            this.configMap = (Map<String, CacheConfig>) CacheConfig.fromJSON(resource.getInputStream());
+            this.configMap = (Map<String, CacheConfig>) CacheConfig.fromYAML(resource.getInputStream());
         } catch (IOException e) {
             // try to read yaml
             try {
-                this.configMap = (Map<String, CacheConfig>) CacheConfig.fromYAML(resource.getInputStream());
+                this.configMap = (Map<String, CacheConfig>) CacheConfig.fromJSON(resource.getInputStream());
             } catch (IOException e1) {
+                e1.addSuppressed(e);
                 throw new BeanDefinitionStoreException(
                         "Could not parse cache configuration at [" + configLocation + "]", e1);
             }

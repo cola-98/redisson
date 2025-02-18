@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,12 +65,8 @@ public class DefaultReferenceCodecProvider implements ReferenceCodecProvider {
 
     @Override
     public <T extends Codec, K extends RObject> T getCodec(RObjectField anno, Class<?> cls, Class<K> rObjectClass, String fieldName, Config config) {
-        try {
-            if (!ClassUtils.getDeclaredField(cls, fieldName).isAnnotationPresent(anno.getClass())) {
-                throw new IllegalArgumentException("Annotation RObjectField does not present on field " + fieldName + " of type [" + cls.getCanonicalName() + "]");
-            }
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
+        if (!ClassUtils.isAnnotationPresent(cls, anno.annotationType())) {
+            throw new IllegalArgumentException("Annotation RObjectField does not present on field " + fieldName + " of type [" + cls.getCanonicalName() + "]");
         }
         if (rObjectClass.isInterface()) {
             throw new IllegalArgumentException("Cannot lookup an interface class of RObject [" + rObjectClass.getCanonicalName() + "]. Concrete class only.");
@@ -83,7 +79,7 @@ public class DefaultReferenceCodecProvider implements ReferenceCodecProvider {
             codecClass = anno.codec();
         }
         
-        return this.<T>getCodec((Class<T>) codecClass);
+        return this.getCodec((Class<T>) codecClass);
     }
     
     @Override

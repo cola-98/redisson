@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,11 +34,11 @@ import java.util.List;
  */
 public class ClusterNodesDecoder implements Decoder<List<ClusterNodeInfo>> {
 
-    private final boolean ssl;
+    private final String scheme;
     
-    public ClusterNodesDecoder(boolean ssl) {
+    public ClusterNodesDecoder(String scheme) {
         super();
-        this.ssl = ssl;
+        this.scheme = scheme;
     }
 
     @Override
@@ -64,18 +64,10 @@ public class ClusterNodesDecoder implements Decoder<List<ClusterNodeInfo>> {
             }
             
             if (!node.containsFlag(Flag.NOADDR)) {
-                String protocol = "redis://";
-                if (ssl) {
-                    protocol = "rediss://";
-                }
-                
-                String addr = params[1].split("@")[0];
-                String name = addr.substring(0, addr.lastIndexOf(":"));
-                if (name.isEmpty()) {
-                    // skip nodes with empty address
+                String uri = createUri(params);
+                if (uri == null) {
                     continue;
                 }
-                String uri = protocol + addr;
                 node.setAddress(uri);
             }
 
@@ -102,6 +94,22 @@ public class ClusterNodesDecoder implements Decoder<List<ClusterNodeInfo>> {
             nodes.add(node);
         }
         return nodes;
+    }
+
+    private String createUri(String[] params) {
+        String[] parts = params[1].split(",");
+        String addr = parts[0].split("@")[0];
+        String name = addr.substring(0, addr.lastIndexOf(":"));
+        if (name.isEmpty()) {
+            // skip nodes with empty address
+            return null;
+        }
+
+        if (parts.length == 2) {
+            String port = addr.substring(name.length() + 1);
+            addr = parts[1] + ":" + port;
+        }
+        return scheme + "://" + addr;
     }
 
 }

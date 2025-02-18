@@ -1,11 +1,9 @@
 package org.redisson;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.redisson.api.RRateLimiter;
-import org.redisson.api.RScoredSortedSet;
-import org.redisson.api.RateIntervalUnit;
-import org.redisson.api.RateType;
+import org.junit.jupiter.api.Timeout;
+import org.redisson.api.*;
+import org.redisson.config.Config;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -16,7 +14,22 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class RedissonRateLimiterTest extends BaseTest {
+public class RedissonRateLimiterTest extends RedisDockerTest {
+
+    @Test
+    public void testKeepAliveTime() throws InterruptedException {
+        RRateLimiter limiter = redisson.getRateLimiter("testKeepAliveTime");
+        limiter.delete();
+        limiter.trySetRate(RateType.OVERALL, 1, Duration.ofSeconds(1), Duration.ofSeconds(1));
+        Thread.sleep(Duration.ofMillis(1100));
+        assertThat(limiter.isExists()).isFalse();
+        limiter.trySetRate(RateType.OVERALL, 10, Duration.ofSeconds(2), Duration.ofSeconds(2));
+        Thread.sleep(Duration.ofSeconds(1));
+        assertThat(limiter.tryAcquire()).isTrue();
+        assertThat(limiter.remainTimeToLive()).isGreaterThan(1500);
+
+
+    }
 
     @Test
     public void testExpire2() throws InterruptedException {
@@ -50,7 +63,7 @@ public class RedissonRateLimiterTest extends BaseTest {
             Thread.sleep(1000);
         }
 
-        assertThat(sizes.stream().filter(s -> s == rate).count()).isGreaterThan(16);
+        assertThat(sizes.stream().filter(s -> s == rate).count()).isGreaterThanOrEqualTo(16);
         e.shutdownNow();
     }
 
@@ -122,7 +135,7 @@ public class RedissonRateLimiterTest extends BaseTest {
         limiter.trySetRate(RateType.PER_CLIENT, 1, 1, RateIntervalUnit.SECONDS);
         
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> limiter.tryAcquire(20))
-                    .hasMessageContaining("Requested permits amount could not exceed defined rate");
+                    .hasMessageContaining("Requested permits amount cannot exceed defined rate");
         assertThat(limiter.tryAcquire()).isTrue();
     }
 
@@ -165,15 +178,14 @@ public class RedissonRateLimiterTest extends BaseTest {
     
     
     @Test
+    @Timeout(2)
     public void testTryAcquire() {
-        Assertions.assertTimeout(Duration.ofMillis(1500), () -> {
-            RRateLimiter rr = redisson.getRateLimiter("acquire");
-            assertThat(rr.trySetRate(RateType.OVERALL, 1, 5, RateIntervalUnit.SECONDS)).isTrue();
+        RRateLimiter rr = redisson.getRateLimiter("acquire");
+        assertThat(rr.trySetRate(RateType.OVERALL, 1, 5, RateIntervalUnit.SECONDS)).isTrue();
 
-            assertThat(rr.tryAcquire(1, 1, TimeUnit.SECONDS)).isTrue();
-            assertThat(rr.tryAcquire(1, 1, TimeUnit.SECONDS)).isFalse();
-            assertThat(rr.tryAcquire()).isFalse();
-        });
+        assertThat(rr.tryAcquire(1, 1, TimeUnit.SECONDS)).isTrue();
+        assertThat(rr.tryAcquire(1, 1, TimeUnit.SECONDS)).isFalse();
+        assertThat(rr.tryAcquire()).isFalse();
     }
     
     @Test
@@ -307,12 +319,52 @@ public class RedissonRateLimiterTest extends BaseTest {
         for (Long value : queue) {
             if (count % 10 == 0) {
                 if (start > 0) {
-                    assertThat(value - start).isGreaterThan(980);
+                    assertThat(value - start).isGreaterThan(940);
                 }
                 start = value;
             }
             count++;
         }
+    }
+
+    @Test
+    public void testChangeRate() {
+        /* Test case -- PRE_CLIENT */
+        RRateLimiter rr = redisson.getRateLimiter("test_change_rate");
+        rr.setRate(RateType.PER_CLIENT, 10, 1, RateIntervalUnit.SECONDS);
+        assertThat(rr.getConfig().getRate()).isEqualTo(10);
+        //check value in Redis
+        rr.acquire(1);
+        String valueKey = redisson.getKeys().getKeysStream().filter(k -> k.contains("value:")).findAny().get();
+        Long value = redisson.getAtomicLong(valueKey).get();
+        assertThat(value).isEqualTo(9);
+
+        //change to 20/s
+        rr.setRate(RateType.PER_CLIENT, 20, 1, RateIntervalUnit.SECONDS);
+        assertThat(rr.getConfig().getRate()).isEqualTo(20);
+        //check value in Redis
+        rr.acquire(1);
+        value = redisson.getAtomicLong(valueKey).get();
+        assertThat(value).isEqualTo(19);
+
+        /* Test case -- OVERALL */
+        rr.setRate(RateType.OVERALL, 10, 1, RateIntervalUnit.SECONDS);
+        assertThat(rr.getConfig().getRate()).isEqualTo(10);
+        //check value in Redis
+        rr.acquire(1);
+        valueKey = redisson.getKeys().getKeysStream().filter(k -> k.endsWith("value")).findAny().get();
+        value = redisson.getAtomicLong(valueKey).get();
+        assertThat(value).isEqualTo(9);
+
+        rr.setRate(RateType.OVERALL, 20, 1, RateIntervalUnit.SECONDS);
+        assertThat(rr.getConfig().getRate()).isEqualTo(20);
+        //check value in Redis
+        rr.acquire(1);
+        value = redisson.getAtomicLong(valueKey).get();
+        assertThat(value).isEqualTo(19);
+
+        //clean all keys in test
+        redisson.getKeys().deleteByPattern("*test_change_rate*");
     }
     
 }

@@ -1,22 +1,60 @@
 package org.redisson;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import org.awaitility.Awaitility;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.redisson.api.RBlockingQueue;
+import org.redisson.api.RFuture;
+import org.redisson.api.RPriorityBlockingQueue;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.Config;
+import org.redisson.misc.RedisURI;
+import org.testcontainers.containers.GenericContainer;
 
-import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-import org.redisson.RedisRunner.RedisProcess;
-import org.redisson.api.RBlockingQueue;
-import org.redisson.api.RFuture;
-import org.redisson.api.RedissonClient;
-import org.redisson.config.Config;
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class RedissonPriorityBlockingQueueTest extends RedissonBlockingQueueTest {
+
+    @Test
+    public void testLambda() {
+        RPriorityBlockingQueue<RedisURI> priorityQueue = redisson.getPriorityBlockingQueue("anyQueue");
+        Assertions.assertThrowsExactly(IllegalArgumentException.class, () -> {
+            priorityQueue.trySetComparator(Comparator.comparing(RedisURI::getHost));
+        });
+    }
+
+    @Test
+    public void testTakeInterrupted() throws InterruptedException {
+        AtomicBoolean interrupted = new AtomicBoolean();
+
+        Thread t = new Thread(() -> {
+            try {
+                RBlockingQueue<Integer> queue1 = getQueue(redisson);
+                queue1.take();
+            } catch (InterruptedException e) {
+                interrupted.set(true);
+            }
+        });
+
+        t.start();
+        t.join(1000);
+
+        t.interrupt();
+        Awaitility.await().atMost(Duration.ofSeconds(1)).untilTrue(interrupted);
+
+        RBlockingQueue<Integer> q = getQueue(redisson);
+        q.add(1);
+        Thread.sleep(1000);
+        assertThat(q.contains(1)).isTrue();
+    }
 
     @Override
     <T> RBlockingQueue<T> getQueue() {
@@ -34,15 +72,11 @@ public class RedissonPriorityBlockingQueueTest extends RedissonBlockingQueueTest
     }
     
     @Test
-    public void testPollAsyncReattach() throws InterruptedException, IOException, ExecutionException, TimeoutException {
-        RedisProcess runner = new RedisRunner()
-                .nosave()
-                .randomDir()
-                .randomPort()
-                .run();
-        
-        Config config = new Config();
-        config.useSingleServer().setAddress(runner.getRedisServerAddressAndPort());
+    public void testPollAsyncReattach() throws InterruptedException, ExecutionException {
+        GenericContainer<?> redis = createRedis();
+        redis.start();
+
+        Config config = createConfig(redis);
         RedissonClient redisson = Redisson.create(config);
         
         RBlockingQueue<Integer> queue1 = getQueue(redisson);
@@ -52,13 +86,9 @@ public class RedissonPriorityBlockingQueueTest extends RedissonBlockingQueueTest
         } catch (ExecutionException | TimeoutException e) {
             // skip
         }
-        runner.stop();
 
-        runner = new RedisRunner()
-                .port(runner.getRedisServerPort())
-                .nosave()
-                .randomDir()
-                .run();
+        restart(redis);
+
         queue1.put(123);
         
         // check connection rotation
@@ -71,20 +101,17 @@ public class RedissonPriorityBlockingQueueTest extends RedissonBlockingQueueTest
         assertThat(result).isEqualTo(123);
         
         redisson.shutdown();
-        runner.stop();
+        redis.stop();
     }
     
     @Test
     public void testTakeReattach() throws Exception {
-        RedisProcess runner = new RedisRunner()
-                .nosave()
-                .randomDir()
-                .randomPort()
-                .run();
-        
-        Config config = new Config();
-        config.useSingleServer().setAddress(runner.getRedisServerAddressAndPort());
+        GenericContainer<?> redis = createRedis();
+        redis.start();
+
+        Config config = createConfig(redis);
         RedissonClient redisson = Redisson.create(config);
+
         RBlockingQueue<Integer> queue1 = getQueue(redisson);
         RFuture<Integer> f = queue1.takeAsync();
         try {
@@ -92,13 +119,9 @@ public class RedissonPriorityBlockingQueueTest extends RedissonBlockingQueueTest
         } catch (ExecutionException | TimeoutException e) {
             // skip
         }
-        runner.stop();
 
-        runner = new RedisRunner()
-                .port(runner.getRedisServerPort())
-                .nosave()
-                .randomDir()
-                .run();
+        restart(redis);
+
         queue1.put(123);
         
         // check connection rotation
@@ -109,9 +132,9 @@ public class RedissonPriorityBlockingQueueTest extends RedissonBlockingQueueTest
         Integer result = f.get();
         assertThat(result).isEqualTo(123);
         assertThat(queue1.size()).isEqualTo(10);
-        runner.stop();
-        
+
         redisson.shutdown();
+        redis.stop();
     }
 
  

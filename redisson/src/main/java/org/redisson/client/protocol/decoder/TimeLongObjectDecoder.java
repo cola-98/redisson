@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package org.redisson.client.protocol.decoder;
 import org.redisson.client.handler.State;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 
@@ -27,9 +28,23 @@ import java.util.List;
 
 public class TimeLongObjectDecoder implements MultiDecoder<Long> {
 
+    private final TimeUnit timeUnit;
+
+    public TimeLongObjectDecoder() {
+        this(null);
+    }
+
+    public TimeLongObjectDecoder(TimeUnit timeUnit) {
+        this.timeUnit = timeUnit;
+    }
+
     @Override
     public Long decode(List<Object> parts, State state) {
-        return ((Long) parts.get(0)) * 1000L + ((Long) parts.get(1)) / 1000L;
+        long time = ((Long) parts.get(0)) * 1000L + ((Long) parts.get(1)) / 1000L;
+        if (timeUnit != null) {
+            return timeUnit.convert(time, TimeUnit.MILLISECONDS);
+        }
+        return time;
     }
     
 }

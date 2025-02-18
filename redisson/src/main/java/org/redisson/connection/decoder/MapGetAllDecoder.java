@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,10 +47,10 @@ public class MapGetAllDecoder implements MultiDecoder<Map<Object, Object>> {
     @Override
     public Map<Object, Object> decode(List<Object> parts, State state) {
         if (parts.isEmpty()) {
-            return new HashMap<Object, Object>();
+            return new HashMap<>();
         }
-        Map<Object, Object> result = new LinkedHashMap<Object, Object>(parts.size());
-        for (int index = 0; index < args.size()-shiftIndex; index++) {
+        Map<Object, Object> result = new LinkedHashMap<>(parts.size());
+        for (int index = 0; index < parts.size()-shiftIndex; index++) {
             Object value = parts.get(index);
             if (!allowNulls && value == null) {
                 continue;

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,6 +41,12 @@ public class TypeConvertor implements Convertor<RType> {
         }
         if ("hash".equals(val)) {
             return RType.MAP;
+        }
+        if ("stream".equals(val)) {
+            return RType.STREAM;
+        }
+        if ("ReJSON-RL".equals(val)) {
+            return RType.JSON;
         }
         if ("none".equals(val)) {
             return null;

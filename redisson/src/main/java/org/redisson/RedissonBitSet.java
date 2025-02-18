@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -264,6 +264,11 @@ public class RedissonBitSet extends RedissonExpirable implements RBitSet {
     }
 
     @Override
+    public void set(long[] indexArray, boolean value) {
+        get(setAsync(indexArray, value));
+    }
+
+    @Override
     public boolean get(long bitIndex) {
         return get(getAsync(bitIndex));
     }
@@ -271,6 +276,24 @@ public class RedissonBitSet extends RedissonExpirable implements RBitSet {
     @Override
     public RFuture<Boolean> getAsync(long bitIndex) {
         return commandExecutor.readAsync(getRawName(), LongCodec.INSTANCE, RedisCommands.GETBIT, getRawName(), bitIndex);
+    }
+
+    @Override
+    public boolean[] get(long... bitIndexes) {
+        return get(getAsync(bitIndexes));
+    }
+
+    @Override
+    public RFuture<boolean[]> getAsync(long... bitIndexes) {
+        Object[] indexes = new Object[bitIndexes.length * 3 + 1];
+        int j = 0;
+        indexes[j++] = getRawName();
+        for (long l : bitIndexes) {
+            indexes[j++] = "get";
+            indexes[j++] = "u1";
+            indexes[j++] = l;
+        }
+        return commandExecutor.readAsync(getRawName(), LongCodec.INSTANCE, RedisCommands.BITFIELD_BOOLEANS, indexes);
     }
 
     @Override
@@ -300,11 +323,22 @@ public class RedissonBitSet extends RedissonExpirable implements RBitSet {
     }
 
     protected int toInt(boolean value) {
-        int val = 0;
-        if (value) {
-            val = 1;
+        return Boolean.compare(value, false);
+    }
+
+    @Override
+    public RFuture<Void> setAsync(long[] indexArray, boolean value) {
+        int val = toInt(value);
+        Object[] paramArray = new Object[indexArray.length * 4 + 1];
+        int j = 0;
+        paramArray[j++] = getRawName();
+        for (long l : indexArray) {
+            paramArray[j++] = "set";
+            paramArray[j++] = "u1";
+            paramArray[j++] = l;
+            paramArray[j++] = val;
         }
-        return val;
+        return commandExecutor.writeAsync(getRawName(), StringCodec.INSTANCE, RedisCommands.BITFIELD_VOID, paramArray);
     }
 
     @Override
@@ -411,14 +445,22 @@ public class RedissonBitSet extends RedissonExpirable implements RBitSet {
     @Override
     public RFuture<Long> lengthAsync() {
         return commandExecutor.evalReadAsync(getRawName(), LongCodec.INSTANCE, RedisCommands.EVAL_LONG,
-                "local fromBit = redis.call('bitpos', KEYS[1], 1, -1);"
-                + "local toBit = 8*(fromBit/8 + 1) - fromBit % 8;"
-                        + "for i = toBit, fromBit, -1 do "
-                            + "if redis.call('getbit', KEYS[1], i) == 1 then "
-                                + "return i+1;"
-                            + "end;"
-                       + "end;" +
-                     "return fromBit+1",
+                "local i = redis.call('bitpos', KEYS[1], 1, -1); "
+                        + "local pos = i < 0 and redis.call('bitpos', KEYS[1], 0, -1) or math.floor(i / 8) * 8; "
+                        + "while  (pos >= 0) "
+                        + "do "
+                            + "i = redis.call('bitpos', KEYS[1], 1, math.floor(pos / 8), math.floor(pos / 8)); "
+                            + "if i < 0 then "
+                                + "pos = pos - 8; "
+                            + "else "
+                                + "for j = pos + 7, pos, -1 do "
+                                    + "if redis.call('getbit', KEYS[1], j) == 1 then "
+                                        + "return j + 1; "
+                                    + "end; "
+                                + "end; "
+                            + "end; "
+                        + "end; "
+                        + "return 0; ",
                 Collections.<Object>singletonList(getRawName()));
     }
 

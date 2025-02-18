@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import org.redisson.misc.CompletableFutureWrapper;
 import org.redisson.transaction.operation.*;
 import org.redisson.transaction.operation.bucket.*;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -336,7 +337,13 @@ public class RedissonTransactionalBucket<V> extends RedissonBucket<V> {
         long currentThreadId = Thread.currentThread().getId();
         return setAsync(value, new BucketSetOperation<V>(getName(), getLockName(), getCodec(), value, timeToLive, timeUnit, transactionId, currentThreadId));
     }
-    
+
+    @Override
+    public RFuture<Void> setAsync(V value, Duration duration) {
+        long currentThreadId = Thread.currentThread().getId();
+        return setAsync(value, new BucketSetOperation<V>(getName(), getLockName(), getCodec(), value, duration.toMillis(), TimeUnit.MILLISECONDS, transactionId, currentThreadId));
+    }
+
     @Override
     public RFuture<Boolean> trySetAsync(V newValue) {
         long currentThreadId = Thread.currentThread().getId();

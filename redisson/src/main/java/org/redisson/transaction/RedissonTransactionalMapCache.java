@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -148,7 +148,7 @@ public class RedissonTransactionalMapCache<K, V> extends RedissonMapCache<K, V> 
     
     @Override
     public ScanResult<Entry<Object, Object>> scanIterator(String name, RedisClient client,
-                                                          long startPos, String pattern, int count) {
+                                                          String startPos, String pattern, int count) {
         checkState();
         return transactionalMap.scanIterator(name, client, startPos, pattern, count);
     }
@@ -330,6 +330,12 @@ public class RedissonTransactionalMapCache<K, V> extends RedissonMapCache<K, V> 
     @Override
     public RReadWriteLock getReadWriteLock(K key) {
         throw new UnsupportedOperationException("getReadWriteLock method is not supported in transaction");
+    }
+
+    @Override
+    public Set<K> keySet(String pattern, int count) {
+        checkState();
+        return transactionalMap.keySet(pattern, count);
     }
 
 }

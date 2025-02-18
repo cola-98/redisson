@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,19 +15,17 @@
  */
 package org.redisson;
 
-import java.util.Arrays;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Condition;
-
 import org.redisson.api.RFuture;
 import org.redisson.api.RLock;
 import org.redisson.client.codec.LongCodec;
-import org.redisson.client.codec.StringCodec;
 import org.redisson.client.protocol.RedisCommands;
 import org.redisson.client.protocol.RedisStrictCommand;
 import org.redisson.command.CommandAsyncExecutor;
 import org.redisson.pubsub.LockPubSub;
+
+import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
 
 /**
  * Lock will be removed automatically if client disconnects.
@@ -56,7 +54,7 @@ public class RedissonReadLock extends RedissonLock implements RLock {
     
     @Override
     <T> RFuture<T> tryLockInnerAsync(long waitTime, long leaseTime, TimeUnit unit, long threadId, RedisStrictCommand<T> command) {
-        return evalWriteAsync(getRawName(), LongCodec.INSTANCE, command,
+        return commandExecutor.syncedEvalNoRetry(getRawName(), LongCodec.INSTANCE, command,
                                 "local mode = redis.call('hget', KEYS[1], 'mode'); " +
                                 "if (mode == false) then " +
                                   "redis.call('hset', KEYS[1], 'mode', 'read'); " +
@@ -81,15 +79,21 @@ public class RedissonReadLock extends RedissonLock implements RLock {
     }
 
     @Override
-    protected RFuture<Boolean> unlockInnerAsync(long threadId) {
+    protected RFuture<Boolean> unlockInnerAsync(long threadId, String requestId, int timeout) {
         String timeoutPrefix = getReadWriteTimeoutNamePrefix(threadId);
         String keyPrefix = getKeyPrefix(threadId, timeoutPrefix);
 
-        return evalWriteAsync(getRawName(), LongCodec.INSTANCE, RedisCommands.EVAL_BOOLEAN,
+        return evalWriteSyncedNoRetryAsync(getRawName(), LongCodec.INSTANCE, RedisCommands.EVAL_BOOLEAN,
+          "local val = redis.call('get', KEYS[5]); " +
+                "if val ~= false then " +
+                    "return tonumber(val);" +
+                "end; " +
+
                 "local mode = redis.call('hget', KEYS[1], 'mode'); " +
                 "if (mode == false) then " +
-                    "redis.call('publish', KEYS[2], ARGV[1]); " +
-                    "return 1; " +
+                    "redis.call(ARGV[3], KEYS[2], ARGV[1]); " +
+                    "redis.call('set', KEYS[5], 1, 'px', ARGV[4]); " +
+                    "return nil; " +
                 "end; " +
                 "local lockExists = redis.call('hexists', KEYS[1], ARGV[2]); " +
                 "if (lockExists == 0) then " +
@@ -117,54 +121,41 @@ public class RedissonReadLock extends RedissonLock implements RLock {
                             
                     "if maxRemainTime > 0 then " +
                         "redis.call('pexpire', KEYS[1], maxRemainTime); " +
+                        "redis.call('set', KEYS[5], 0, 'px', ARGV[4]); " +
                         "return 0; " +
                     "end;" + 
                         
-                    "if mode == 'write' then " + 
-                        "return 0;" + 
+                    "if mode == 'write' then " +
+                        "redis.call('set', KEYS[5], 0, 'px', ARGV[4]); " +
+                        "return 0;" +
                     "end; " +
                 "end; " +
                     
                 "redis.call('del', KEYS[1]); " +
-                "redis.call('publish', KEYS[2], ARGV[1]); " +
+                "redis.call(ARGV[3], KEYS[2], ARGV[1]); " +
+                "redis.call('set', KEYS[5], 1, 'px', ARGV[4]); " +
                 "return 1; ",
-                Arrays.<Object>asList(getRawName(), getChannelName(), timeoutPrefix, keyPrefix),
-                LockPubSub.UNLOCK_MESSAGE, getLockName(threadId));
+                Arrays.<Object>asList(getRawName(), getChannelName(), timeoutPrefix, keyPrefix, getUnlockLatchName(requestId)),
+                LockPubSub.UNLOCK_MESSAGE, getLockName(threadId), getSubscribeService().getPublishCommand(), timeout);
     }
 
     protected String getKeyPrefix(long threadId, String timeoutPrefix) {
         return timeoutPrefix.split(":" + getLockName(threadId))[0];
     }
-    
+
     @Override
-    protected CompletionStage<Boolean> renewExpirationAsync(long threadId) {
+    protected void scheduleExpirationRenewal(long threadId) {
         String timeoutPrefix = getReadWriteTimeoutNamePrefix(threadId);
         String keyPrefix = getKeyPrefix(threadId, timeoutPrefix);
-        
-        return evalWriteAsync(getRawName(), LongCodec.INSTANCE, RedisCommands.EVAL_BOOLEAN,
-                "local counter = redis.call('hget', KEYS[1], ARGV[2]); " +
-                "if (counter ~= false) then " +
-                    "redis.call('pexpire', KEYS[1], ARGV[1]); " +
-                    
-                    "if (redis.call('hlen', KEYS[1]) > 1) then " +
-                        "local keys = redis.call('hkeys', KEYS[1]); " + 
-                        "for n, key in ipairs(keys) do " + 
-                            "counter = tonumber(redis.call('hget', KEYS[1], key)); " + 
-                            "if type(counter) == 'number' then " + 
-                                "for i=counter, 1, -1 do " + 
-                                    "redis.call('pexpire', KEYS[2] .. ':' .. key .. ':rwlock_timeout:' .. i, ARGV[1]); " + 
-                                "end; " + 
-                            "end; " + 
-                        "end; " +
-                    "end; " +
-                    
-                    "return 1; " +
-                "end; " +
-                "return 0;",
-            Arrays.<Object>asList(getRawName(), keyPrefix),
-            internalLockLeaseTime, getLockName(threadId));
+        renewalScheduler.renewReadLock(getRawName(), threadId, getLockName(threadId), keyPrefix);
     }
-    
+
+    @Override
+    protected void cancelExpirationRenewal(Long threadId, Boolean unlockResult) {
+        super.cancelExpirationRenewal(threadId, unlockResult);
+        renewalScheduler.cancelReadLockRenewal(getRawName(), threadId);
+    }
+
     @Override
     public Condition newCondition() {
         throw new UnsupportedOperationException();
@@ -172,22 +163,29 @@ public class RedissonReadLock extends RedissonLock implements RLock {
 
     @Override
     public RFuture<Boolean> forceUnlockAsync() {
-        cancelExpirationRenewal(null);
-        return evalWriteAsync(getRawName(), LongCodec.INSTANCE, RedisCommands.EVAL_BOOLEAN,
+        cancelExpirationRenewal(null, null);
+        return commandExecutor.syncedEvalWithRetry(getRawName(), LongCodec.INSTANCE, RedisCommands.EVAL_BOOLEAN,
                 "if (redis.call('hget', KEYS[1], 'mode') == 'read') then " +
                     "redis.call('del', KEYS[1]); " +
-                    "redis.call('publish', KEYS[2], ARGV[1]); " +
+                    "redis.call(ARGV[2], KEYS[2], ARGV[1]); " +
                     "return 1; " +
                 "end; " +
                 "return 0; ",
-                Arrays.<Object>asList(getRawName(), getChannelName()), LockPubSub.UNLOCK_MESSAGE);
+                Arrays.asList(getRawName(), getChannelName()),
+                LockPubSub.UNLOCK_MESSAGE, getSubscribeService().getPublishCommand());
     }
 
     @Override
     public boolean isLocked() {
-        RFuture<String> future = commandExecutor.writeAsync(getRawName(), StringCodec.INSTANCE, RedisCommands.HGET, getRawName(), "mode");
-        String res = get(future);
-        return "read".equals(res);
+        RFuture<Boolean> future = commandExecutor.evalWriteAsync(getRawName(), LongCodec.INSTANCE, RedisCommands.EVAL_BOOLEAN,
+          "local mode = redis.call('hget', KEYS[1], 'mode'); " +
+                "if (mode == 'read') or (mode == 'write' and redis.call('hlen', KEYS[1]) > 2) then " +
+                    "return 1; " +
+                "end; " +
+                "return 0; ",
+                Arrays.asList(getRawName()));
+
+        return get(future);
     }
 
 }

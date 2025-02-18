@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -109,6 +109,11 @@ public class RedissonListMultimapValues<V> extends RedissonExpirable implements 
                 "end; " +
                 "return res; ",
                 Arrays.<Object>asList(timeoutSetName, getRawName()), System.currentTimeMillis(), key);
+    }
+
+    @Override
+    public RFuture<Boolean> copyAsync(List<Object> keys, int database, boolean replace) {
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -232,7 +237,7 @@ public class RedissonListMultimapValues<V> extends RedissonExpirable implements 
               + "end; " +
                 "local items = redis.call('lrange', KEYS[2], 0, -1);" +
                         "for i = 1, #items, 1 do " +
-                            "for j = 2, #ARGV, 1 do "
+                            "for j = #ARGV, 3, -1 do "
                             + "if ARGV[j] == items[i] "
                             + "then table.remove(ARGV, j) end "
                         + "end; "
@@ -285,7 +290,7 @@ public class RedissonListMultimapValues<V> extends RedissonExpirable implements 
                       + "end; " +
                 
                         "local v = 0 " +
-                        "for i = 2, #ARGV, 1 do "
+                        "for i = 3, #ARGV, 1 do "
                             + "if redis.call('lrem', KEYS[2], 0, ARGV[i]) == 1 "
                             + "then v = 1 end "
                         +"end "
@@ -326,7 +331,7 @@ public class RedissonListMultimapValues<V> extends RedissonExpirable implements 
                        + "while i <= #s do "
                             + "local element = s[i]; "
                             + "local isInAgrs = false; "
-                            + "for j = 2, #ARGV, 1 do "
+                            + "for j = 3, #ARGV, 1 do "
                                 + "if ARGV[j] == element then "
                                     + "isInAgrs = true; "
                                     + "break; "
@@ -364,7 +369,7 @@ public class RedissonListMultimapValues<V> extends RedissonExpirable implements 
         return new RedissonBaseIterator<V>() {
 
             @Override
-            protected ScanResult<Object> iterator(RedisClient client, long nextIterPos) {
+            protected ScanResult<Object> iterator(RedisClient client, String nextIterPos) {
                 return distributedScanIterator(iteratorName, count);
             }
 
@@ -380,7 +385,7 @@ public class RedissonListMultimapValues<V> extends RedissonExpirable implements 
     }
 
     private RFuture<ScanResult<Object>> distributedScanIteratorAsync(String iteratorName, int count) {
-        return commandExecutor.evalWriteAsync(getRawName(), codec, RedisCommands.EVAL_SSCAN,
+        return commandExecutor.evalWriteAsync(getRawName(), codec, RedisCommands.EVAL_SCAN,
                 "local cursor = redis.call('get', KEYS[3]); "
                 + "if cursor ~= false then "
                     + "cursor = tonumber(cursor); "

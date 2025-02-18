@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -229,7 +229,7 @@ public class RedissonReactiveHashCommands extends RedissonBaseReactive implement
             byte[] keyBuf = toByteArray(command.getKey());
             Flux<Entry<Object, Object>> flux = Flux.create(new MapReactiveIterator<Object, Object, Entry<Object, Object>>(null, null, 0) {
                 @Override
-                public RFuture<ScanResult<Object>> scanIterator(RedisClient client, long nextIterPos) {
+                public RFuture<ScanResult<Object>> scanIterator(RedisClient client, String nextIterPos) {
                     if (command.getOptions().getPattern() == null) {
                         return executorService.readAsync(client, keyBuf, ByteArrayCodec.INSTANCE, RedisCommands.HSCAN, 
                                 keyBuf, nextIterPos, "COUNT", Optional.ofNullable(command.getOptions().getCount()).orElse(10L));

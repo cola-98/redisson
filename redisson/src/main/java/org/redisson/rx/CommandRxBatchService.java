@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,43 +21,43 @@ import org.redisson.api.BatchResult;
 import org.redisson.api.RFuture;
 import org.redisson.client.codec.Codec;
 import org.redisson.client.protocol.RedisCommand;
+import org.redisson.command.BatchService;
 import org.redisson.command.CommandAsyncExecutor;
 import org.redisson.command.CommandBatchService;
 import org.redisson.connection.ConnectionManager;
 import org.redisson.connection.NodeSource;
 import org.redisson.liveobject.core.RedissonObjectBuilder;
+import org.redisson.misc.CompletableFutureWrapper;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 
  * @author Nikita Koksharov
  *
  */
-public class CommandRxBatchService extends CommandRxService {
+public class CommandRxBatchService extends CommandRxService implements BatchService {
 
     private final CommandBatchService batchService;
 
-    public CommandRxBatchService(ConnectionManager connectionManager, CommandAsyncExecutor executor, BatchOptions options) {
+    CommandRxBatchService(ConnectionManager connectionManager, CommandAsyncExecutor executor, BatchOptions options) {
         super(connectionManager, executor.getObjectBuilder());
         batchService = new CommandBatchService(executor, options, RedissonObjectBuilder.ReferenceType.RXJAVA);
     }
     
     @Override
-    public <R> Flowable<R> flowable(Callable<CompletableFuture<R>> supplier) {
-        Flowable<R> flowable = super.flowable(new Callable<CompletableFuture<R>>() {
-            volatile CompletableFuture<R> future;
+    public <R> Flowable<R> flowable(Callable<RFuture<R>> supplier) {
+        Flowable<R> flowable = super.flowable(new Callable<RFuture<R>>() {
+            final CompletableFuture<R> future = new CompletableFuture<>();
+            final AtomicBoolean lock = new AtomicBoolean();
             @Override
-            public CompletableFuture<R> call() throws Exception {
-                if (future == null) {
-                    synchronized (this) {
-                        if (future == null) {
-                            future = supplier.call();
-                        }
-                    }
+            public RFuture<R> call() throws Exception {
+                if (lock.compareAndSet(false, true)) {
+                    transfer(supplier.call().toCompletableFuture(), future);
                 }
-                return future;
+                return new CompletableFutureWrapper<>(future);
             }
         });
         flowable.subscribe();
@@ -75,11 +75,11 @@ public class CommandRxBatchService extends CommandRxService {
         return batchService.async(readOnlyMode, nodeSource, codec, command, params, ignoreRedirect, noRetry);
     }
 
-    public CompletableFuture<BatchResult<?>> executeAsync() {
-        return batchService.executeAsync().toCompletableFuture();
+    public RFuture<BatchResult<?>> executeAsync() {
+        return batchService.executeAsync();
     }
 
-    public CompletableFuture<Void> discardAsync() {
-        return batchService.discardAsync().toCompletableFuture();
+    public RFuture<Void> discardAsync() {
+        return batchService.discardAsync();
     }
 }

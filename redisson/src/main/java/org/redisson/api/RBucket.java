@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -100,7 +100,7 @@ public interface RBucket<V> extends RExpirable, RBucketAsync<V> {
     boolean setIfExists(V value);
 
     /**
-     * Sets value only if object holder already exists.
+     * Use {@link #setIfExists(Object, Duration)} instead
      *
      * @param value - value to set
      * @param timeToLive - time to live interval
@@ -108,7 +108,18 @@ public interface RBucket<V> extends RExpirable, RBucketAsync<V> {
      * @return {@code true} if successful, or {@code false} if
      *         element wasn't set
      */
+    @Deprecated
     boolean setIfExists(V value, long timeToLive, TimeUnit timeUnit);
+
+    /**
+     * Sets <code>value</code> with expiration <code>duration</code> only if object holder already exists.
+     *
+     * @param value value to set
+     * @param duration expiration duration
+     * @return {@code true} if successful, or {@code false} if
+     *         element wasn't set
+     */
+    boolean setIfExists(V value, Duration duration);
 
     /**
      * Atomically sets the value to the given updated value
@@ -131,14 +142,25 @@ public interface RBucket<V> extends RExpirable, RBucketAsync<V> {
     V getAndSet(V newValue);
 
     /**
-     * Retrieves current element in the holder and replaces it with <code>newValue</code> with defined <code>timeToLive</code> interval. 
+     * Use {@link #getAndSet(Object, Duration)} instead
      * 
      * @param value - value to set
      * @param timeToLive - time to live interval
      * @param timeUnit - unit of time to live interval
      * @return previous value
      */
+    @Deprecated
     V getAndSet(V value, long timeToLive, TimeUnit timeUnit);
+
+    /**
+     * Retrieves current element in the holder and replaces it
+     * with <code>value</code> with defined expiration <code>duration</code>.
+     *
+     * @param value value to set
+     * @param duration expiration duration
+     * @return previous value
+     */
+    V getAndSet(V value, Duration duration);
 
     /**
      * Retrieves current element in the holder and sets an expiration duration for it.
@@ -177,13 +199,22 @@ public interface RBucket<V> extends RExpirable, RBucketAsync<V> {
     void set(V value);
 
     /**
-     * Stores element into the holder with defined <code>timeToLive</code> interval.
+     * Use {@link #set(Object, Duration)} instead
      * 
      * @param value - value to set
      * @param timeToLive - time to live interval
      * @param timeUnit - unit of time to live interval
      */
+    @Deprecated
     void set(V value, long timeToLive, TimeUnit timeUnit);
+
+    /**
+     * Stores <code>value</code> into the holder with defined expiration <code>duration</code>.
+     *
+     * @param value value to set
+     * @param duration expiration duration
+     */
+    void set(V value, Duration duration);
 
     /**
      * Set value and keep existing TTL.
@@ -197,6 +228,7 @@ public interface RBucket<V> extends RExpirable, RBucketAsync<V> {
     /**
      * Adds object event listener
      *
+     * @see org.redisson.api.listener.TrackingListener
      * @see org.redisson.api.ExpiredObjectListener
      * @see org.redisson.api.DeletedObjectListener
      * @see org.redisson.api.listener.SetObjectListener
@@ -205,5 +237,23 @@ public interface RBucket<V> extends RExpirable, RBucketAsync<V> {
      * @return listener id
      */
     int addListener(ObjectListener listener);
+
+    /**
+     * Returns the common part of the data stored in this bucket
+     * and a bucket defined by the <code>name</code>
+     *
+     * @param name second bucket
+     * @return common part of the data
+     */
+    V findCommon(String name);
+
+    /**
+     * Returns the length of the common part of the data stored in this bucket
+     * and a bucket defined by the <code>name</code>
+     *
+     * @param name second bucket
+     * @return common part of the data
+     */
+    long findCommonLength(String name);
 
 }

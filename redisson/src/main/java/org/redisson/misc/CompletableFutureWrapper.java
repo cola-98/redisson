@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package org.redisson.misc;
 
 import org.redisson.api.RFuture;
 
+import java.util.List;
 import java.util.concurrent.*;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -50,6 +51,11 @@ public class CompletableFutureWrapper<V> implements RFuture<V> {
 
     public CompletableFutureWrapper(CompletableFuture<V> future) {
         this.future = future;
+        this.lastFuture = future;
+    }
+
+    public CompletableFutureWrapper(List<CompletableFuture<?>> futures) {
+        this.future = (CompletableFuture<V>) CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
         this.lastFuture = future;
     }
 

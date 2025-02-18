@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,16 +15,18 @@
  */
 package org.redisson;
 
-import java.util.Collections;
-
+import org.redisson.api.ObjectListener;
 import org.redisson.api.RAtomicLong;
 import org.redisson.api.RFuture;
+import org.redisson.api.listener.IncrByListener;
 import org.redisson.client.codec.LongCodec;
 import org.redisson.client.codec.StringCodec;
 import org.redisson.client.protocol.RedisCommands;
 import org.redisson.client.protocol.RedisStrictCommand;
 import org.redisson.client.protocol.convertor.Convertor;
 import org.redisson.command.CommandAsyncExecutor;
+
+import java.util.Collections;
 
 /**
  * Distributed alternative to the {@link java.util.concurrent.atomic.AtomicLong}
@@ -166,9 +168,72 @@ public class RedissonAtomicLong extends RedissonExpirable implements RAtomicLong
     public RFuture<Void> setAsync(long newValue) {
         return commandExecutor.writeAsync(getRawName(), StringCodec.INSTANCE, RedisCommands.SET, getRawName(), newValue);
     }
-
+    
+    @Override
+    public boolean setIfLess(long less, long value) {
+        return get(setIfLessAsync(less, value));
+    }
+    
+    @Override
+    public RFuture<Boolean> setIfLessAsync(long less, long value) {
+        return commandExecutor.evalWriteAsync(getRawName(), StringCodec.INSTANCE, RedisCommands.EVAL_BOOLEAN,
+        "local currValue = redis.call('get', KEYS[1]); "
+                + "currValue = currValue == false and 0 or tonumber(currValue);"
+                + "if currValue < tonumber(ARGV[1]) then "
+                    + "redis.call('set', KEYS[1], ARGV[2]); "
+                    + "return 1;"
+                + "end; "
+                + "return 0;",
+                Collections.<Object>singletonList(getRawName()), less, value);
+    }
+    
+    @Override
+    public boolean setIfGreater(long greater, long value) {
+        return get(setIfGreaterAsync(greater, value));
+    }
+    
+    @Override
+    public RFuture<Boolean> setIfGreaterAsync(long greater, long value) {
+        return commandExecutor.evalWriteAsync(getRawName(), StringCodec.INSTANCE, RedisCommands.EVAL_BOOLEAN,
+                "local currValue = redis.call('get', KEYS[1]); "
+                        + "currValue = currValue == false and 0 or tonumber(currValue);"
+                        + "if currValue > tonumber(ARGV[1]) then "
+                            + "redis.call('set', KEYS[1], ARGV[2]); "
+                            + "return 1;"
+                        + "end; "
+                        + "return 0;",
+                Collections.<Object>singletonList(getRawName()), greater, value);
+    }
+    
     public String toString() {
         return Long.toString(get());
+    }
+
+    @Override
+    public int addListener(ObjectListener listener) {
+        if (listener instanceof IncrByListener) {
+            return addListener("__keyevent@*:incrby", (IncrByListener) listener, IncrByListener::onChange);
+        }
+        return super.addListener(listener);
+    }
+
+    @Override
+    public RFuture<Integer> addListenerAsync(ObjectListener listener) {
+        if (listener instanceof IncrByListener) {
+            return addListenerAsync("__keyevent@*:incrby", (IncrByListener) listener, IncrByListener::onChange);
+        }
+        return super.addListenerAsync(listener);
+    }
+
+    @Override
+    public void removeListener(int listenerId) {
+        removeListener(listenerId, "__keyevent@*:incrby");
+        super.removeListener(listenerId);
+    }
+
+    @Override
+    public RFuture<Void> removeListenerAsync(int listenerId) {
+        return removeListenerAsync(listenerId, "__keyevent@*:incrby");
     }
 
 }

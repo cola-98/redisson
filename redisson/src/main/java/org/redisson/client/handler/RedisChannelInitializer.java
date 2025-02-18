@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,15 +31,18 @@ import org.redisson.client.RedisClient;
 import org.redisson.client.RedisClientConfig;
 import org.redisson.client.RedisConnection;
 import org.redisson.config.SslProvider;
+import org.redisson.config.SslVerificationMode;
 
-import javax.net.ssl.*;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
+import javax.net.ssl.TrustManagerFactory;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.UnrecoverableKeyException;
-import java.security.cert.CertificateException;
+import java.util.Arrays;
 
 /**
  * 
@@ -82,7 +85,7 @@ public class RedisChannelInitializer extends ChannelInitializer<Channel> {
 
         ch.pipeline().addLast(
             connectionWatchdog,
-            CommandEncoder.INSTANCE,
+            new CommandEncoder(config.getCommandMapper()),
             CommandBatchEncoder.INSTANCE);
 
         if (type == Type.PLAIN) {
@@ -106,8 +109,7 @@ public class RedisChannelInitializer extends ChannelInitializer<Channel> {
         config.getNettyHook().afterChannelInitialization(ch);
     }
     
-    private void initSsl(final RedisClientConfig config, Channel ch) throws KeyStoreException, IOException,
-            NoSuchAlgorithmException, CertificateException, SSLException, UnrecoverableKeyException {
+    private void initSsl(RedisClientConfig config, Channel ch) throws GeneralSecurityException, IOException {
         if (!config.getAddress().isSsl()) {
             return;
         }
@@ -117,10 +119,17 @@ public class RedisChannelInitializer extends ChannelInitializer<Channel> {
             provided = io.netty.handler.ssl.SslProvider.OPENSSL;
         }
         
-        SslContextBuilder sslContextBuilder = SslContextBuilder.forClient().sslProvider(provided);
+        SslContextBuilder sslContextBuilder = SslContextBuilder.forClient()
+                                                    .sslProvider(provided)
+                                                    .keyStoreType(config.getSslKeystoreType());
+
         sslContextBuilder.protocols(config.getSslProtocols());
+        if (config.getSslCiphers() != null) {
+            sslContextBuilder.ciphers(Arrays.asList(config.getSslCiphers()));
+        }
+
         if (config.getSslTruststore() != null) {
-            KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+            KeyStore keyStore = getKeyStore(config);
             
             InputStream stream = config.getSslTruststore().openStream();
             try {
@@ -137,9 +146,12 @@ public class RedisChannelInitializer extends ChannelInitializer<Channel> {
             trustManagerFactory.init(keyStore);
             sslContextBuilder.trustManager(trustManagerFactory);
         }
+        if (config.getSslTrustManagerFactory() != null) {
+            sslContextBuilder.trustManager(config.getSslTrustManagerFactory());
+        }
 
         if (config.getSslKeystore() != null){
-            KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+            KeyStore keyStore = getKeyStore(config);
             
             InputStream stream = config.getSslKeystore().openStream();
             char[] password = null;
@@ -156,10 +168,16 @@ public class RedisChannelInitializer extends ChannelInitializer<Channel> {
             keyManagerFactory.init(keyStore, password);
             sslContextBuilder.keyManager(keyManagerFactory);
         }
+        if (config.getSslKeyManagerFactory() != null) {
+            sslContextBuilder.keyManager(config.getSslKeyManagerFactory());
+        }
         
         SSLParameters sslParams = new SSLParameters();
-        if (config.isSslEnableEndpointIdentification()) {
+
+        if (config.getSslVerificationMode() == SslVerificationMode.STRICT) {
             sslParams.setEndpointIdentificationAlgorithm("HTTPS");
+        } else if (config.getSslVerificationMode() == SslVerificationMode.CA_ONLY) {
+            sslParams.setEndpointIdentificationAlgorithm("");
         } else {
             if (config.getSslTruststore() == null) {
                 sslContextBuilder.trustManager(InsecureTrustManagerFactory.INSTANCE);
@@ -171,7 +189,7 @@ public class RedisChannelInitializer extends ChannelInitializer<Channel> {
         if (hostname == null || NetUtil.createByteArrayFromIpAddressString(hostname) != null) {
             hostname = config.getAddress().getHost();
         }
-        
+
         SSLEngine sslEngine = sslContext.newEngine(ch.alloc(), hostname, config.getAddress().getPort());
         sslEngine.setSSLParameters(sslParams);
         
@@ -207,5 +225,12 @@ public class RedisChannelInitializer extends ChannelInitializer<Channel> {
 
         });
     }
-    
+
+    private KeyStore getKeyStore(RedisClientConfig config) throws KeyStoreException {
+        if (config.getSslKeystoreType() != null) {
+            return KeyStore.getInstance(config.getSslKeystoreType());
+        }
+        return KeyStore.getInstance(KeyStore.getDefaultType());
+    }
+
 }

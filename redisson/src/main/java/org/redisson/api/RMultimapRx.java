@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -119,6 +119,15 @@ public interface RMultimapRx<K, V> extends RExpirableRx {
     Single<Integer> keySize();
 
     /**
+     * Stores a collection of values with the same key, replacing any existing
+     * values for that key. Is faster by not returning the values.
+     *
+     * @param key - map key
+     * @param values - map values
+     */
+    Single<Void> fastReplaceValues(K key, Iterable<? extends V> values);
+
+    /**
      * Removes <code>keys</code> from map by one operation
      *
      * Works faster than <code>RMultimap.remove</code> but not returning
@@ -128,6 +137,14 @@ public interface RMultimapRx<K, V> extends RExpirableRx {
      * @return the number of keys that were removed from the hash, not including specified but non existing keys
      */
     Single<Long> fastRemove(K... keys);
+
+    /**
+     * Removes <code>values</code> from map by one operation
+     *
+     * @param values map values
+     * @return the number of values that were removed from the map
+     */
+    Single<Long> fastRemoveValue(V... values);
 
     /**
      * Read all keys at once

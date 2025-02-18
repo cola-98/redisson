@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import reactor.core.publisher.Mono;
  * @author Nikita Koksharov
  *
  */
-public interface RLockReactive {
+public interface RLockReactive extends RObservableReactive {
 
     /**
      * Returns name of object
@@ -171,6 +171,15 @@ public interface RLockReactive {
      * @return <code>true</code> if locked otherwise <code>false</code>
      */
     Mono<Boolean> isLocked();
+
+    /**
+     * Checks if the lock is held by thread with defined <code>threadId</code>
+     *
+     * @param threadId Thread ID of locking thread
+     * @return <code>true</code> if held by thread with given id
+     *          otherwise <code>false</code>
+     */
+    Mono<Boolean> isHeldByThread(long threadId);
 
     /**
      * Remaining time to live of the lock

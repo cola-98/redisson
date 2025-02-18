@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,19 +15,18 @@
  */
 package org.redisson;
 
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-
+import io.netty.util.Timeout;
+import io.netty.util.TimerTask;
 import org.redisson.api.RFuture;
 import org.redisson.api.RTopic;
 import org.redisson.api.listener.BaseStatusListener;
 import org.redisson.api.listener.MessageListener;
-import org.redisson.connection.ConnectionManager;
+import org.redisson.connection.ServiceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.netty.util.Timeout;
-import io.netty.util.TimerTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 
@@ -59,13 +58,13 @@ public abstract class QueueTransferTask {
         
     }
     
-    private int usage = 1;
+    private volatile int usage = 1;
     private final AtomicReference<TimeoutTask> lastTimeout = new AtomicReference<TimeoutTask>();
-    private final ConnectionManager connectionManager;
-    
-    public QueueTransferTask(ConnectionManager connectionManager) {
+    private final ServiceManager serviceManager;
+
+    public QueueTransferTask(ServiceManager serviceManager) {
         super();
-        this.connectionManager = connectionManager;
+        this.serviceManager = serviceManager;
     }
 
     public void incUsage() {
@@ -99,23 +98,31 @@ public abstract class QueueTransferTask {
     
     public void stop() {
         RTopic schedulerTopic = getTopic();
-        schedulerTopic.removeListener(messageListenerId);
-        schedulerTopic.removeListener(statusListenerId);
+        schedulerTopic.removeListener(messageListenerId, statusListenerId);
+
+        TimeoutTask oldTimeout = lastTimeout.get();
+        if (oldTimeout != null) {
+            oldTimeout.getTask().cancel();
+        }
     }
 
     private void scheduleTask(final Long startTime) {
-        TimeoutTask oldTimeout = lastTimeout.get();
+        if (usage == 0) {
+            return;
+        }
+
         if (startTime == null) {
             return;
         }
-        
+
+        TimeoutTask oldTimeout = lastTimeout.get();
         if (oldTimeout != null) {
             oldTimeout.getTask().cancel();
         }
         
         long delay = startTime - System.currentTimeMillis();
         if (delay > 10) {
-            Timeout timeout = connectionManager.newTimeout(new TimerTask() {                    
+            Timeout timeout = serviceManager.newTimeout(new TimerTask() {
                 @Override
                 public void run(Timeout timeout) throws Exception {
                     pushTask();
@@ -139,10 +146,14 @@ public abstract class QueueTransferTask {
     protected abstract RFuture<Long> pushTaskAsync();
     
     private void pushTask() {
+        if (usage == 0) {
+            return;
+        }
+
         RFuture<Long> startTimeFuture = pushTaskAsync();
         startTimeFuture.whenComplete((res, e) -> {
             if (e != null) {
-                if (e instanceof RedissonShutdownException) {
+                if (serviceManager.isShuttingDown(e)) {
                     return;
                 }
                 log.error(e.getMessage(), e);

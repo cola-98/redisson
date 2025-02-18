@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ public class TransactionalSet<V> extends BaseTransactionalSet<V> {
     }
 
     @Override
-    protected ScanResult<Object> scanIteratorSource(String name, RedisClient client, long startPos,
+    protected ScanResult<Object> scanIteratorSource(String name, RedisClient client, String startPos,
                                                     String pattern, int count) {
         return ((ScanIterator) set).scanIterator(name, client, startPos, pattern, count);
     }

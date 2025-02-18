@@ -1,22 +1,11 @@
 package org.redisson.spring.cache;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-import java.io.IOException;
-import java.io.Serializable;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
-
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.redisson.BaseTest;
-import org.redisson.RedisRunner;
-import org.redisson.RedisRunner.FailedToStartRedisException;
+import org.redisson.RedisDockerTest;
 import org.redisson.api.RedissonClient;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
@@ -29,9 +18,24 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Service;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
+import reactor.core.publisher.Mono;
+
+import java.io.IOException;
+import java.io.Serializable;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringJUnitConfig
-public class RedissonSpringCacheTest {
+public class RedissonSpringCacheTest extends RedisDockerTest {
 
     public static class SampleObject implements Serializable {
 
@@ -60,26 +64,33 @@ public class RedissonSpringCacheTest {
     @Service
     public static class SampleBean {
 
-        @CachePut(cacheNames = "testMap", key = "#key")
+        @Cacheable(cacheNames = "monoCache", sync = true)
+        public Mono<String> readMono() {
+            return Mono.delay(Duration.ofSeconds(1))
+                    .map(i -> "Hello world")
+                    .log();
+        }
+
+        @CachePut(cacheNames = "testMap", key = "#p0")
         public SampleObject store(String key, SampleObject object) {
             return object;
         }
 
-        @CachePut(cacheNames = "testMap", key = "#key")
+        @CachePut(cacheNames = "testMap", key = "#p0")
         public SampleObject storeNull(String key) {
             return null;
         }
 
-        @CacheEvict(cacheNames = "testMap", key = "#key")
+        @CacheEvict(cacheNames = "testMap", key = "#p0")
         public void remove(String key) {
         }
 
-        @Cacheable(cacheNames = "testMap", key = "#key")
+        @Cacheable(cacheNames = "testMap", key = "#p0")
         public SampleObject read(String key) {
             throw new IllegalStateException();
         }
 
-        @Cacheable(cacheNames = "testMap", key = "#key")
+        @Cacheable(cacheNames = "testMap", key = "#p0")
         public SampleObject readNull(String key) {
             return null;
         }
@@ -93,7 +104,7 @@ public class RedissonSpringCacheTest {
 
         @Bean(destroyMethod = "shutdown")
         RedissonClient redisson() {
-            return BaseTest.createInstance();
+            return createInstance();
         }
 
         @Bean
@@ -112,7 +123,7 @@ public class RedissonSpringCacheTest {
 
         @Bean(destroyMethod = "shutdown")
         RedissonClient redisson() {
-            return BaseTest.createInstance();
+            return createInstance();
         }
 
         @Bean
@@ -129,15 +140,13 @@ public class RedissonSpringCacheTest {
     }
 
     @BeforeAll
-    public static void before() throws FailedToStartRedisException, IOException, InterruptedException {
-        RedisRunner.startDefaultRedisServerInstance();
+    public static void before() {
         contexts = data().stream().collect(Collectors.toMap(e -> e, e -> new AnnotationConfigApplicationContext(e)));
     }
 
     @AfterAll
-    public static void after() throws InterruptedException {
+    public static void after() {
         contexts.values().forEach(e -> e.close());
-        RedisRunner.shutDownDefaultRedisServerInstance();
     }
 
     @ParameterizedTest
@@ -171,6 +180,28 @@ public class RedissonSpringCacheTest {
         SampleObject s = bean.read("object1");
         assertThat(s.getName()).isEqualTo("name1");
         assertThat(s.getValue()).isEqualTo("value1");
+    }
+
+    @ParameterizedTest
+    @MethodSource("data")
+    public void testMono(Class<?> contextClass) throws InterruptedException {
+        AnnotationConfigApplicationContext context = contexts.get(contextClass);
+        SampleBean bean = context.getBean(SampleBean.class);
+
+        CacheManager cm = context.getBean(CacheManager.class);
+        System.out.println(cm);
+        ExecutorService e = Executors.newFixedThreadPool(2);
+        for (int t = 0; t < 2; t++) {
+            e.submit(() -> {
+                for (int i = 0; i < 5; i++) {
+                    Mono<String> m = bean.readMono();
+                    m.block();
+                }
+            });
+        }
+
+        e.shutdown();
+        assertThat(e.awaitTermination(3, TimeUnit.SECONDS)).isTrue();
     }
 
     @ParameterizedTest

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,26 +17,55 @@ package org.redisson.api.stream;
 
 import org.redisson.api.StreamMessageId;
 
-import java.util.Map;
+import java.time.Duration;
 
 /**
  *
  * @author Nikita Koksharov
  *
  */
-public class StreamReadGroupParams extends StreamReadParams {
+public final class StreamReadGroupParams implements StreamReadGroupArgs {
 
     private boolean noAck;
+    private final StreamMessageId id1;
+    private int count;
+    private Duration timeout;
 
-    public StreamReadGroupParams(StreamMessageId id1, Map<String, StreamMessageId> offsets) {
-        super(id1, offsets);
+    StreamReadGroupParams(StreamMessageId id1) {
+        this.id1 = id1;
+    }
+
+    @Override
+    public StreamReadGroupArgs noAck() {
+        this.noAck = true;
+        return this;
+    }
+
+    @Override
+    public StreamReadGroupArgs count(int count) {
+        this.count = count;
+        return this;
+    }
+
+    @Override
+    public StreamReadGroupArgs timeout(Duration timeout) {
+        this.timeout = timeout;
+        return this;
     }
 
     public boolean isNoAck() {
         return noAck;
     }
 
-    public void setNoAck(boolean noAck) {
-        this.noAck = noAck;
+    public StreamMessageId getId1() {
+        return id1;
+    }
+
+    public int getCount() {
+        return count;
+    }
+
+    public Duration getTimeout() {
+        return timeout;
     }
 }

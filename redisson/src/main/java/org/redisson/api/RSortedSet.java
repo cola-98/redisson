@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import org.redisson.api.mapreduce.RCollectionMapReduce;
  *
  * @param <V> value type
  */
-public interface RSortedSet<V> extends SortedSet<V>, RObject {
+public interface RSortedSet<V> extends SortedSet<V>, RExpirable {
 
     /**
      * Returns <code>RMapReduce</code> object associated with this object

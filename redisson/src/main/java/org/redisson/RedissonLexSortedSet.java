@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ import org.redisson.misc.CompletableFutureWrapper;
  * @author Nikita Koksharov
  *
  */
-public class RedissonLexSortedSet extends RedissonScoredSortedSet<String> implements RLexSortedSet {
+public final class RedissonLexSortedSet extends RedissonScoredSortedSet<String> implements RLexSortedSet {
 
     public RedissonLexSortedSet(CommandAsyncExecutor commandExecutor, String name, RedissonClient redisson) {
         super(StringCodec.INSTANCE, commandExecutor, name, redisson);

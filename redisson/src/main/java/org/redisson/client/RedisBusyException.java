@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ package org.redisson.client;
  * @author wuqian
  *
  */
-public class RedisBusyException extends RedisException{
+public class RedisBusyException extends RedisRetryException {
 
     private static final long serialVersionUID = -5658453331593019251L;
 

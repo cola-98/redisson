@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ import java.util.NoSuchElementException;
  *
  * @param <V> the type of elements held in this collection
  */
-public class RedissonQueue<V> extends RedissonList<V> implements RQueue<V> {
+public class RedissonQueue<V> extends BaseRedissonList<V> implements RQueue<V> {
 
     public RedissonQueue(CommandAsyncExecutor commandExecutor, String name, RedissonClient redisson) {
         super(commandExecutor, name, redisson);

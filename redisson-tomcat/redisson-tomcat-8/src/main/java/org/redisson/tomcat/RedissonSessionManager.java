@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,10 +29,12 @@ import org.redisson.client.codec.Codec;
 import org.redisson.client.codec.StringCodec;
 import org.redisson.codec.CompositeCodec;
 import org.redisson.config.Config;
+import org.redisson.pubsub.PublishSubscribeService;
 
 import javax.servlet.http.HttpSession;
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.*;
 
 /**
@@ -50,6 +52,7 @@ public class RedissonSessionManager extends ManagerBase {
     
     protected RedissonClient redisson;
     private String configPath;
+    private Config config;
     
     private ReadMode readMode = ReadMode.REDIS;
     private UpdateMode updateMode = UpdateMode.DEFAULT;
@@ -133,14 +136,6 @@ public class RedissonSessionManager extends ManagerBase {
         
         if (broadcastSessionEvents) {
             getTopic().publish(new SessionCreatedMessage(getNodeId(), session.getId()));
-            session.addSessionListener(new SessionListener() {
-                @Override
-                public void sessionEvent(SessionEvent event) {
-                    if (event.getType().equals(Session.SESSION_DESTROYED_EVENT)) {
-                        getTopic().publish(new SessionDestroyedMessage(getNodeId(), session.getId()));
-                    }
-                }
-            });
         }
         return session;
     }
@@ -151,15 +146,23 @@ public class RedissonSessionManager extends ManagerBase {
         return redisson.getSet(name, StringCodec.INSTANCE);
     }
     
-    public RMap<String, Object> getMap(String sessionId) {
+    public String getTomcatSessionKeyName(String sessionId) {
         String separator = keyPrefix == null || keyPrefix.isEmpty() ? "" : ":";
-        String name = keyPrefix + separator + "redisson:tomcat_session:" + sessionId;
+        return keyPrefix + separator + "redisson:tomcat_session:" + sessionId;
+    }
+
+    public RMap<String, Object> getMap(String sessionId) {
+        String name = getTomcatSessionKeyName(sessionId);
         return redisson.getMap(name, new CompositeCodec(StringCodec.INSTANCE, codecToUse, codecToUse));
     }
 
     public RTopic getTopic() {
         String separator = keyPrefix == null || keyPrefix.isEmpty() ? "" : ":";
         final String name = keyPrefix + separator + "redisson:tomcat_session_updates:" + getContext().getName();
+        PublishSubscribeService ss = ((Redisson) redisson).getCommandExecutor().getConnectionManager().getSubscribeService();
+        if (ss.isShardingSupported()) {
+            return redisson.getShardedTopic(name);
+        }
         return redisson.getTopic(name);
     }
     
@@ -169,7 +172,7 @@ public class RedissonSessionManager extends ManagerBase {
     }
     
     private Session findSession(String id, boolean notify) throws IOException {
-        Session result = super.findSession(id);
+        RedissonSession result = (RedissonSession) super.findSession(id);
         if (result == null) {
             if (id != null) {
                 Map<String, Object> attrs = new HashMap<String, Object>();
@@ -180,7 +183,7 @@ public class RedissonSessionManager extends ManagerBase {
                 }
 
                 if (attrs.isEmpty() || (broadcastSessionEvents && getNotifiedNodes(id).contains(nodeId))) {
-                    log.info("Session " + id + " can't be found");
+                    log.debug("Session " + id + " can't be found");
                     return null;    
                 }
                 
@@ -188,14 +191,14 @@ public class RedissonSessionManager extends ManagerBase {
                 session.load(attrs);
                 session.setId(id, notify);
                 
-                session.access();
+                session.superAccess();
                 session.endAccess();
                 return session;
             }
             return null;
         }
 
-        result.access();
+        result.superAccess();
         result.endAccess();
         
         return result;
@@ -203,18 +206,36 @@ public class RedissonSessionManager extends ManagerBase {
     
     @Override
     public Session createEmptySession() {
-        return new RedissonSession(this, readMode, updateMode, broadcastSessionEvents, this.broadcastSessionUpdates);
+        Session session = new RedissonSession(this, readMode, updateMode, broadcastSessionEvents, this.broadcastSessionUpdates);
+
+        if (broadcastSessionEvents) {
+            session.addSessionListener(event -> {
+                if (event.getType().equals(Session.SESSION_DESTROYED_EVENT)) {
+                    getTopic().publish(new SessionDestroyedMessage(getNodeId(), session.getId()));
+                }
+            });
+        }
+        return session;
     }
     
+    public void superRemove(Session session) {
+        super.remove(session, false);
+    }
+
     @Override
     public void remove(Session session, boolean update) {
         super.remove(session, update);
-        
-        if (session.getIdInternal() != null) {
+
+        if (session.getIdInternal() != null
+                && !redisson.isShuttingDown()) {
             ((RedissonSession)session).delete();
         }
     }
     
+    public void superAdd(Session session) {
+        super.add(session);
+    }
+
     @Override
     public void add(Session session) {
         super.add(session);
@@ -307,20 +328,17 @@ public class RedissonSessionManager extends ManagerBase {
                             }
                         } else {
                             if (msg instanceof SessionCreatedMessage) {
-                                Session s = findSession(msg.getSessionId());
-                                if (s == null) {
-                                    throw new IllegalStateException("Unable to find session: " + msg.getSessionId());
-                                }
+                                findSession(msg.getSessionId());
                             }
                             
                             if (msg instanceof SessionDestroyedMessage) {
                                 Session s = findSession(msg.getSessionId(), false);
-                                if (s == null) {
-                                    throw new IllegalStateException("Unable to find session: " + msg.getSessionId());
+                                if (s != null) {
+                                    s.expire();
                                 }
-                                s.expire();
                                 RSet<String> set = getNotifiedNodes(msg.getSessionId());
                                 set.add(nodeId);
+                                set.expire(Duration.ofSeconds(60));
                             }
                             
                         }
@@ -338,19 +356,20 @@ public class RedissonSessionManager extends ManagerBase {
     }
 
     protected RedissonClient buildClient() throws LifecycleException {
-        Config config = null;
-        try {
-            config = Config.fromYAML(new File(configPath), getClass().getClassLoader());
-        } catch (IOException e) {
-            // trying next format
+        if (config == null) {
             try {
-                config = Config.fromJSON(new File(configPath), getClass().getClassLoader());
-            } catch (IOException e1) {
-                log.error("Can't parse json config " + configPath, e);
-                throw new LifecycleException("Can't parse yaml config " + configPath, e1);
+                config = Config.fromYAML(new File(configPath), getClass().getClassLoader());
+            } catch (IOException e) {
+                // trying next format
+                try {
+                    config = Config.fromJSON(new File(configPath), getClass().getClassLoader());
+                } catch (IOException e1) {
+                    log.error("Can't parse json config " + configPath, e);
+                    throw new LifecycleException("Can't parse yaml config " + configPath, e1);
+                }
             }
         }
-        
+
         try {
             return Redisson.create(config);
         } catch (Exception e) {
@@ -410,8 +429,8 @@ public class RedissonSessionManager extends ManagerBase {
         
         RedissonSession sess = (RedissonSession) super.findSession(session.getId());
         if (sess != null) {
-            sess.access();
-            sess.endAccess();
+            sess.superAccess();
+            sess.superEndAccess();
             sess.save();
         }
     }

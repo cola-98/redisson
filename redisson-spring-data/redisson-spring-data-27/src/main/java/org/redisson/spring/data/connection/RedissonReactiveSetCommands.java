@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -271,7 +271,7 @@ public class RedissonReactiveSetCommands extends RedissonBaseReactive implements
             byte[] keyBuf = toByteArray(command.getKey());
             Flux<byte[]> flux = Flux.create(new SetReactiveIterator<byte[]>() {
                 @Override
-                protected RFuture<ScanResult<Object>> scanIterator(RedisClient client, long nextIterPos) {
+                protected RFuture<ScanResult<Object>> scanIterator(RedisClient client, String nextIterPos) {
                     if (command.getOptions().getPattern() == null) {
                         return executorService.readAsync(client, keyBuf, ByteArrayCodec.INSTANCE, RedisCommands.SSCAN, 
                                 keyBuf, nextIterPos, "COUNT", Optional.ofNullable(command.getOptions().getCount()).orElse(10L));
@@ -299,7 +299,7 @@ public class RedissonReactiveSetCommands extends RedissonBaseReactive implements
         });
     }
 
-    private static final RedisCommand<List<Boolean>> SMISMEMBER = new RedisCommand<>("SMISMEMBER", new ObjectListReplayDecoder<>());
+    private static final RedisCommand<List<Boolean>> SMISMEMBER = new RedisCommand("SMISMEMBER", new ObjectListReplayDecoder<>(), new BooleanReplayConvertor());
 
     @Override
     public Flux<ReactiveRedisConnection.MultiValueResponse<SMIsMemberCommand, Boolean>> sMIsMember(Publisher<SMIsMemberCommand> commands) {

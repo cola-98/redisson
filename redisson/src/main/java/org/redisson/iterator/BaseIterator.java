@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import java.util.NoSuchElementException;
 
 import org.redisson.ScanResult;
 import org.redisson.client.RedisClient;
+import org.redisson.client.RedisNodeNotFoundException;
 
 /**
  * 
@@ -31,12 +32,15 @@ import org.redisson.client.RedisClient;
 public abstract class BaseIterator<V, E> implements Iterator<V> {
 
     private Iterator<E> lastIter;
-    protected long nextIterPos;
+    protected String nextIterPos = "0";
     protected RedisClient client;
 
     private boolean finished;
     private boolean currentElementRemoved;
     protected E value;
+
+    protected void reset() {
+    }
 
     @Override
     public boolean hasNext() {
@@ -44,7 +48,7 @@ public abstract class BaseIterator<V, E> implements Iterator<V> {
             if (finished) {
                 currentElementRemoved = false;
                 client = null;
-                nextIterPos = 0;
+                nextIterPos = "0";
 
                 if (!tryAgain()) {
                     return false;
@@ -52,20 +56,30 @@ public abstract class BaseIterator<V, E> implements Iterator<V> {
                 finished = false;
             }
             do {
-                ScanResult<E> res = iterator(client, nextIterPos);
+                ScanResult<E> res;
+                try {
+                    res = iterator(client, nextIterPos);
+                } catch (RedisNodeNotFoundException e) {
+                    if (client != null) {
+                        client = null;
+                        nextIterPos = "0";
+                    }
+                    reset();
+                    res = iterator(client, nextIterPos);
+                }
                 
                 client = res.getRedisClient();
                 
                 lastIter = res.getValues().iterator();
                 nextIterPos = res.getPos();
 
-                if (res.getPos() == 0) {
+                if ("0".equals(res.getPos())) {
                     finished = true;
                     if (res.getValues().isEmpty()) {
                         currentElementRemoved = false;
                         
                         client = null;
-                        nextIterPos = 0;
+                        nextIterPos = "0";
                         if (tryAgain()) {
                             continue;
                         }
@@ -82,7 +96,7 @@ public abstract class BaseIterator<V, E> implements Iterator<V> {
         return false;
     }
 
-    protected abstract ScanResult<E> iterator(RedisClient client, long nextIterPos);
+    protected abstract ScanResult<E> iterator(RedisClient client, String nextIterPos);
 
     @Override
     public V next() {

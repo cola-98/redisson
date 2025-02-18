@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -80,7 +80,7 @@ public class RedisClientEntry implements ClusterNode {
             return res;
         });
 
-        commandExecutor.getConnectionManager().newTimeout(t -> {
+        commandExecutor.getServiceManager().newTimeout(t -> {
             RedisTimeoutException ex = new RedisTimeoutException("Command execution timeout for command: PING, Redis client: " + client);
             s.completeExceptionally(ex);
         }, timeout, timeUnit);

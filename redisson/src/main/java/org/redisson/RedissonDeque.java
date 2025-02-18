@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,19 +15,18 @@
  */
 package org.redisson;
 
-import java.util.*;
-
 import org.redisson.api.RDeque;
 import org.redisson.api.RFuture;
 import org.redisson.api.RedissonClient;
 import org.redisson.api.queue.DequeMoveArgs;
 import org.redisson.api.queue.DequeMoveParams;
-import org.redisson.api.queue.DequeMoveSource;
 import org.redisson.client.codec.Codec;
 import org.redisson.client.protocol.RedisCommand;
 import org.redisson.client.protocol.RedisCommands;
 import org.redisson.client.protocol.decoder.ListFirstObjectDecoder;
 import org.redisson.command.CommandAsyncExecutor;
+
+import java.util.*;
 
 /**
  * Distributed and concurrent implementation of {@link java.util.Queue}
@@ -128,8 +127,7 @@ public class RedissonDeque<V> extends RedissonQueue<V> implements RDeque<V> {
 
     @Override
     public RFuture<V> moveAsync(DequeMoveArgs args) {
-        DequeMoveSource source = (DequeMoveSource) args;
-        DequeMoveParams pp = source.getParams();
+        DequeMoveParams pp = (DequeMoveParams) args;
         return commandExecutor.writeAsync(getRawName(), codec, RedisCommands.LMOVE, getRawName(),
                                                 pp.getDestName(), pp.getSourceDirection(), pp.getDestDirection());
     }

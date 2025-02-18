@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,12 +19,14 @@ import org.redisson.api.*;
 import org.redisson.client.codec.ByteArrayCodec;
 import org.redisson.client.codec.Codec;
 import org.redisson.client.codec.StringCodec;
+import org.redisson.client.protocol.RedisCommand;
 import org.redisson.client.protocol.RedisCommands;
 import org.redisson.command.CommandAsyncExecutor;
 import org.redisson.misc.CompletableFutureWrapper;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 /**
  *
@@ -38,12 +40,12 @@ public class RedissonFuction implements RFunction {
 
     public RedissonFuction(CommandAsyncExecutor commandExecutor) {
         this.commandExecutor = commandExecutor;
-        this.codec = commandExecutor.getConnectionManager().getCodec();
+        this.codec = commandExecutor.getServiceManager().getCfg().getCodec();
     }
 
     public RedissonFuction(CommandAsyncExecutor commandExecutor, Codec codec) {
         this.commandExecutor = commandExecutor;
-        this.codec = codec;
+        this.codec = commandExecutor.getServiceManager().getCodec(codec);
     }
 
     @Override
@@ -116,7 +118,7 @@ public class RedissonFuction implements RFunction {
 
     @Override
     public RFuture<Void> loadAsync(String libraryName, String code) {
-        return commandExecutor.writeAllVoidAsync(RedisCommands.FUNCTION_LOAD, "Lua", libraryName, code);
+        return commandExecutor.writeAllVoidAsync(RedisCommands.FUNCTION_LOAD, "#!lua name=" + libraryName + " \n " + code);
     }
 
     @Override
@@ -126,8 +128,8 @@ public class RedissonFuction implements RFunction {
 
     @Override
     public RFuture<Void> loadAndReplaceAsync(String libraryName, String code) {
-        return commandExecutor.writeAllVoidAsync(RedisCommands.FUNCTION_LOAD,
-                                                "Lua", libraryName, "REPLACE", code);
+        return commandExecutor.writeAllVoidAsync(RedisCommands.FUNCTION_LOAD, "REPLACE",
+                                                                                "#!lua name=" + libraryName + " \n " + code);
     }
 
     @Override
@@ -198,19 +200,35 @@ public class RedissonFuction implements RFunction {
         List<Object> args = new ArrayList<>();
         args.add(name);
         args.add(keys.size());
-        if (keys.size() > 0) {
-            args.add(keys);
+        if (!keys.isEmpty()) {
+            args.addAll(keys.stream().map(k -> {
+                                         if (k instanceof String) {
+                                             return commandExecutor.getServiceManager().getConfig().getNameMapper().map(k.toString());
+                                         }
+                                         return k;
+                                     })
+                                     .collect(Collectors.toList()));
         }
         args.addAll(encode(Arrays.asList(values), codec));
         if (mode == FunctionMode.READ) {
-            return commandExecutor.readAsync(key, codec, returnType.getCommand(), args.toArray());
+            RedisCommand cmd = new RedisCommand("FCALL_RO", returnType.getCommand().getReplayMultiDecoder(), returnType.getCommand().getConvertor());
+            return commandExecutor.readAsync(key, codec, cmd, args.toArray());
         }
         return commandExecutor.writeAsync(key, codec, returnType.getCommand(), args.toArray());
     }
 
     @Override
     public <R> RFuture<R> callAsync(FunctionMode mode, String name, FunctionResult returnType, List<Object> keys, Object... values) {
-        return callAsync(null, mode, name, returnType, keys, values);
+        String key = null;
+        if (!keys.isEmpty()) {
+            if (keys.get(0) instanceof byte[]) {
+                key = new String((byte[]) keys.get(0));
+            } else {
+                key = keys.get(0).toString();
+            }
+            key = commandExecutor.getServiceManager().getConfig().getNameMapper().map(key);
+        }
+        return callAsync(key, mode, name, returnType, keys, values);
     }
 
     @Override

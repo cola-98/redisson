@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -148,7 +148,7 @@ public class BaseTransactionalMap<K, V> extends BaseTransactionalObject {
     }
     
     protected ScanResult<Map.Entry<Object, Object>> scanIterator(String name, RedisClient client,
-            long startPos, String pattern, int count) {
+                                                                 String startPos, String pattern, int count) {
         ScanResult<Map.Entry<Object, Object>> res = ((RedissonMap<?, ?>) map).scanIterator(name, client, startPos, pattern, count);
         Map<HashValue, MapEntry> newstate = new HashMap<>(state);
         Map<Object, Object> newres = null;
@@ -172,7 +172,7 @@ public class BaseTransactionalMap<K, V> extends BaseTransactionalObject {
             }
         }
         
-        if (startPos == 0) {
+        if ("0".equals(startPos)) {
             for (Entry<HashValue, MapEntry> entry : newstate.entrySet()) {
                 if (entry.getValue() == MapEntry.NULL) {
                     continue;
@@ -469,7 +469,7 @@ public class BaseTransactionalMap<K, V> extends BaseTransactionalObject {
         List<RLock> locks = Arrays.stream(keys).map(k -> getLock(k)).collect(Collectors.toList());
         return executeLocked(timeout, () -> {
             AtomicLong counter = new AtomicLong();
-            List<K> keyList = Arrays.asList(keys);
+            List<K> keyList = new ArrayList<>(Arrays.asList(keys));
             for (Iterator<K> iterator = keyList.iterator(); iterator.hasNext();) {
                 K key = iterator.next();
                 HashValue keyHash = toKeyHash(key);
@@ -484,7 +484,7 @@ public class BaseTransactionalMap<K, V> extends BaseTransactionalObject {
             }
 
             // TODO optimize
-            return map.getAllAsync(new HashSet<>(keyList)).thenApply(res -> {
+            return ((RedissonMap<K, V>) map).getAllAsync(new HashSet<>(keyList), Long.MIN_VALUE).thenApply(res -> {
                 for (K key : res.keySet()) {
                     HashValue keyHash = toKeyHash(key);
                     operations.add(new MapFastRemoveOperation(map, key, transactionId, threadId));
@@ -615,7 +615,22 @@ public class BaseTransactionalMap<K, V> extends BaseTransactionalObject {
         });
         return new CompletableFutureWrapper<>(f);
     }
-    
+
+    protected Set<K> keySet(String pattern, int count) {
+        Set<K> keys = map.keySet(pattern, count);
+        return keys.stream()
+                .filter(k -> {
+                    HashValue hash = toKeyHash(k);
+                    if (state.get(hash) == null
+                            || state.get(hash) != BaseTransactionalMap.MapEntry.NULL) {
+                        return true;
+                    }
+                    return false;
+                })
+                .collect(Collectors.toSet());
+    }
+
+
     protected RFuture<V> removeOperationAsync(K key) {
         long threadId = Thread.currentThread().getId();
         return executeLocked(key, () -> {

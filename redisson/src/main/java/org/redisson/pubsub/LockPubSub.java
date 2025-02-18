@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,20 +41,11 @@ public class LockPubSub extends PublishSubscribe<RedissonLockEntry> {
     @Override
     protected void onMessage(RedissonLockEntry value, Long message) {
         if (message.equals(UNLOCK_MESSAGE)) {
-            Runnable runnableToExecute = value.getListeners().poll();
-            if (runnableToExecute != null) {
-                runnableToExecute.run();
-            }
+            value.tryRunListener();
 
             value.getLatch().release();
         } else if (message.equals(READ_UNLOCK_MESSAGE)) {
-            while (true) {
-                Runnable runnableToExecute = value.getListeners().poll();
-                if (runnableToExecute == null) {
-                    break;
-                }
-                runnableToExecute.run();
-            }
+            value.tryRunAllListeners();
 
             value.getLatch().release(value.getLatch().getQueueLength());
         }

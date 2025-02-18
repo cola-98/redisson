@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,27 +15,17 @@
  */
 package org.redisson.connection;
 
-import io.netty.channel.EventLoopGroup;
-import io.netty.util.Timeout;
-import io.netty.util.TimerTask;
-import io.netty.util.concurrent.Future;
-import org.redisson.ElementsSubscribeService;
+import io.netty.buffer.ByteBuf;
 import org.redisson.api.NodeType;
 import org.redisson.client.RedisClient;
-import org.redisson.client.RedisConnection;
-import org.redisson.client.RedisNodeNotFoundException;
-import org.redisson.client.codec.Codec;
-import org.redisson.client.protocol.RedisCommand;
-import org.redisson.config.Config;
-import org.redisson.config.MasterSlaveServersConfig;
-import org.redisson.misc.InfinitySemaphoreLatch;
+import org.redisson.command.CommandAsyncExecutor;
+import org.redisson.config.*;
+import org.redisson.liveobject.core.RedissonObjectBuilder;
 import org.redisson.misc.RedisURI;
 import org.redisson.pubsub.PublishSubscribeService;
 
 import java.net.InetSocketAddress;
 import java.util.Collection;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -44,58 +34,32 @@ import java.util.concurrent.TimeUnit;
  *
  */
 public interface ConnectionManager {
-    
-    RedisURI applyNatMap(RedisURI address);
 
-    CompletableFuture<RedisURI> resolveIP(RedisURI address);
-    
-    String getId();
-    
-    ElementsSubscribeService getElementsSubscribeService();
+    void connect();
 
     PublishSubscribeService getSubscribeService();
     
-    ExecutorService getExecutor();
-    
     RedisURI getLastClusterNode();
-    
-    Config getCfg();
-
-    boolean isClusterMode();
-
-    ConnectionEventsHub getConnectionEventsHub();
-
-    boolean isShutdown();
-
-    boolean isShuttingDown();
-    
-    IdleConnectionWatcher getConnectionWatcher();
 
     int calcSlot(String key);
-    
+
+    int calcSlot(ByteBuf key);
+
     int calcSlot(byte[] key);
-
-    MasterSlaveServersConfig getConfig();
-
-    Codec getCodec();
 
     Collection<MasterSlaveEntry> getEntrySet();
 
     MasterSlaveEntry getEntry(String name);
 
     MasterSlaveEntry getEntry(int slot);
+
+    MasterSlaveEntry getWriteEntry(int slot);
+
+    MasterSlaveEntry getReadEntry(int slot);
     
     MasterSlaveEntry getEntry(InetSocketAddress address);
-    
-    void releaseRead(NodeSource source, RedisConnection connection);
 
-    void releaseWrite(NodeSource source, RedisConnection connection);
-
-    CompletableFuture<RedisConnection> connectionReadOp(NodeSource source, RedisCommand<?> command);
-
-    CompletableFuture<RedisConnection> connectionWriteOp(NodeSource source, RedisCommand<?> command);
-
-    RedisClient createClient(NodeType type, RedisURI address, int timeout, int commandTimeout, String sslHostname);
+    MasterSlaveEntry getEntry(RedisURI addr);
 
     RedisClient createClient(NodeType type, InetSocketAddress address, RedisURI uri, String sslHostname);
     
@@ -107,14 +71,33 @@ public interface ConnectionManager {
 
     void shutdown(long quietPeriod, long timeout, TimeUnit unit);
     
-    EventLoopGroup getGroup();
+    ServiceManager getServiceManager();
 
-    Timeout newTimeout(TimerTask task, long delay, TimeUnit unit);
+    CommandAsyncExecutor createCommandExecutor(RedissonObjectBuilder objectBuilder,
+                                               RedissonObjectBuilder.ReferenceType referenceType);
 
-    InfinitySemaphoreLatch getShutdownLatch();
-    
-    Future<Void> getShutdownPromise();
+    static ConnectionManager create(Config configCopy) {
+        BaseConfig<?> cfg = ConfigSupport.getConfig(configCopy);
+        ConnectionManager cm = null;
+        if (cfg instanceof MasterSlaveServersConfig) {
+            cm = new MasterSlaveConnectionManager((MasterSlaveServersConfig) cfg, configCopy);
+        } else if (cfg instanceof SingleServerConfig) {
+            cm = new SingleConnectionManager((SingleServerConfig) cfg, configCopy);
+        } else if (cfg instanceof SentinelServersConfig) {
+            cm = new SentinelConnectionManager((SentinelServersConfig) cfg, configCopy);
+        } else if (cfg instanceof ClusterServersConfig) {
+            cm = new ClusterConnectionManager((ClusterServersConfig) cfg, configCopy);
+        } else if (cfg instanceof ReplicatedServersConfig) {
+            cm = new ReplicatedConnectionManager((ReplicatedServersConfig) cfg, configCopy);
+        }
 
-    RedisNodeNotFoundException createNodeNotFoundException(NodeSource source);
+        if (cm == null) {
+            throw new IllegalArgumentException("server(s) address(es) not defined!");
+        }
+        if (!configCopy.isLazyInitialization()) {
+            cm.connect();
+        }
+        return cm;
+    }
 
 }

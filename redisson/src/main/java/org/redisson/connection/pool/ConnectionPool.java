@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,29 +16,24 @@
 package org.redisson.connection.pool;
 
 import org.redisson.api.NodeType;
-import org.redisson.api.RFuture;
+import org.redisson.client.FailedNodeDetector;
 import org.redisson.client.RedisConnection;
 import org.redisson.client.RedisConnectionException;
 import org.redisson.client.protocol.RedisCommand;
-import org.redisson.client.protocol.RedisCommands;
 import org.redisson.config.MasterSlaveServersConfig;
 import org.redisson.connection.ClientConnectionsEntry;
-import org.redisson.connection.ClientConnectionsEntry.FreezeReason;
 import org.redisson.connection.ConnectionManager;
+import org.redisson.connection.ConnectionsHolder;
 import org.redisson.connection.MasterSlaveEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Base connection pool class 
@@ -65,146 +60,44 @@ abstract class ConnectionPool<T extends RedisConnection> {
         this.connectionManager = connectionManager;
     }
 
-    public CompletableFuture<Void> add(ClientConnectionsEntry entry) {
-        CompletableFuture<Void> promise = initConnections(entry, true);
-        return promise.thenAccept(r -> {
-            entries.add(entry);
-        });
+    public final void addEntry(ClientConnectionsEntry entry) {
+        entries.add(entry);
     }
 
-    public CompletableFuture<Void> initConnections(ClientConnectionsEntry entry) {
-        return initConnections(entry, false);
-    }
-    
-    private CompletableFuture<Void> initConnections(ClientConnectionsEntry entry, boolean checkFreezed) {
-        int minimumIdleSize = getMinimumIdleSize(entry);
-
-        if (minimumIdleSize == 0 || (checkFreezed && entry.isFreezed())) {
-            return CompletableFuture.completedFuture(null);
-        }
-
-        CompletableFuture<Void> initPromise = new CompletableFuture<>();
-        AtomicInteger initializedConnections = new AtomicInteger(minimumIdleSize);
-        int startAmount = Math.min(2, minimumIdleSize);
-        AtomicInteger requests = new AtomicInteger(startAmount);
-        for (int i = 0; i < startAmount; i++) {
-            createConnection(checkFreezed, requests, entry, initPromise, minimumIdleSize, initializedConnections);
-        }
-        return initPromise;
+    public final void removeEntry(ClientConnectionsEntry entry) {
+        entries.remove(entry);
     }
 
-    private void createConnection(boolean checkFreezed, AtomicInteger requests, ClientConnectionsEntry entry,
-                                  CompletableFuture<Void> initPromise, int minimumIdleSize, AtomicInteger initializedConnections) {
+    protected abstract ConnectionsHolder<T> getConnectionHolder(ClientConnectionsEntry entry, boolean trackChanges);
 
-        if ((checkFreezed && entry.isFreezed()) || !tryAcquireConnection(entry)) {
-            int totalInitializedConnections = minimumIdleSize - initializedConnections.get();
-            Throwable cause = new RedisConnectionException(
-                    "Unable to init enough connections amount! Only " + totalInitializedConnections + " of " + minimumIdleSize + " were initialized. Server: "
-                                        + entry.getClient().getAddr());
-            initPromise.completeExceptionally(cause);
-            return;
-        }
-
-        CompletableFuture<Void> f = acquireConnection(entry, null);
-        f.thenAccept(r -> {
-            CompletableFuture<T> promise = new CompletableFuture<T>();
-            createConnection(entry, promise);
-            promise.whenComplete((conn, e) -> {
-                if (e == null) {
-                    if (changeUsage()) {
-                        conn.decUsage();
-                    }
-                    if (!initPromise.isDone()) {
-                        entry.addConnection(conn);
-                    } else {
-                        conn.closeAsync();
-                    }
-                }
-
-                releaseConnection(entry);
-
-                if (e != null) {
-                    if (initPromise.isDone()) {
-                        return;
-                    }
-
-                    for (RedisConnection connection : entry.getAllConnections()) {
-                        if (!connection.isClosed()) {
-                            connection.closeAsync();
-                        }
-                    }
-                    entry.getAllConnections().clear();
-
-                    for (RedisConnection connection : entry.getAllSubscribeConnections()) {
-                        if (!connection.isClosed()) {
-                            connection.closeAsync();
-                        }
-                    }
-                    entry.getAllSubscribeConnections().clear();
-
-                    int totalInitializedConnections = minimumIdleSize - initializedConnections.get();
-                    String errorMsg;
-                    if (totalInitializedConnections == 0) {
-                        errorMsg = "Unable to connect to Redis server: " + entry.getClient().getAddr();
-                    } else {
-                        errorMsg = "Unable to init enough connections amount! Only " + totalInitializedConnections
-                                + " of " + minimumIdleSize + " were initialized. Redis server: " + entry.getClient().getAddr();
-                    }
-                    Throwable cause = new RedisConnectionException(errorMsg, e);
-                    initPromise.completeExceptionally(cause);
-                    return;
-                }
-
-                int value = initializedConnections.decrementAndGet();
-                if (value == 0) {
-                    if (initPromise.complete(null)) {
-                        log.info("{} connections initialized for {}", minimumIdleSize, entry.getClient().getAddr());
-                    }
-                } else if (value > 0 && !initPromise.isDone()) {
-                    if (requests.incrementAndGet() <= minimumIdleSize) {
-                        createConnection(checkFreezed, requests, entry, initPromise, minimumIdleSize, initializedConnections);
-                    }
-                }
-            });
-        });
-    }
-
-    protected CompletableFuture<Void> acquireConnection(ClientConnectionsEntry entry, RedisCommand<?> command) {
-        return entry.acquireConnection(command);
-    }
-
-    protected abstract int getMinimumIdleSize(ClientConnectionsEntry entry);
-
-    public CompletableFuture<T> get(RedisCommand<?> command) {
-        List<ClientConnectionsEntry> entriesCopy = new LinkedList<ClientConnectionsEntry>(entries);
-        for (Iterator<ClientConnectionsEntry> iterator = entriesCopy.iterator(); iterator.hasNext();) {
-            ClientConnectionsEntry entry = iterator.next();
-            if (!((!entry.isFreezed() || entry.isMasterForRead()) 
-                    && tryAcquireConnection(entry))) {
-                iterator.remove();
-            }
-        }
+    public CompletableFuture<T> get(RedisCommand<?> command, boolean trackChanges) {
+        List<ClientConnectionsEntry> entriesCopy = new LinkedList<>(entries);
+        entriesCopy.removeIf(n -> n.isFreezed() || !isHealthy(n));
         if (!entriesCopy.isEmpty()) {
-            ClientConnectionsEntry entry = config.getLoadBalancer().getEntry(entriesCopy);
-            return acquireConnection(command, entry);
+            ClientConnectionsEntry entry = config.getLoadBalancer().getEntry(entriesCopy, command);
+            if (entry != null) {
+                log.debug("Entry {} selected as connection source", entry);
+                return acquireConnection(command, entry, trackChanges);
+            }
         }
         
         List<InetSocketAddress> failed = new LinkedList<>();
         List<InetSocketAddress> freezed = new LinkedList<>();
         for (ClientConnectionsEntry entry : entries) {
-            if (entry.isFailed()) {
+            if (entry.getClient().getConfig().getFailedNodeDetector().isNodeFailed()) {
                 failed.add(entry.getClient().getAddr());
             } else if (entry.isFreezed()) {
                 freezed.add(entry.getClient().getAddr());
             }
         }
 
-        StringBuilder errorMsg = new StringBuilder(getClass().getSimpleName() + " no available Redis entries. Master entry host: " + masterSlaveEntry.getClient().getAddr());
+        StringBuilder errorMsg = new StringBuilder(getClass().getSimpleName() + " no available Redis entries. " +
+                "Master entry host: " + masterSlaveEntry.getClient().getAddr() + " entries " + entries);
         if (!freezed.isEmpty()) {
             errorMsg.append(" Disconnected hosts: ").append(freezed);
         }
         if (!failed.isEmpty()) {
-            errorMsg.append(" Hosts disconnected due to errors during `failedSlaveCheckInterval`: ").append(failed);
+            errorMsg.append(" Hosts disconnected by 'failedNodeDetector:' ").append(failed);
         }
 
         RedisConnectionException exception = new RedisConnectionException(errorMsg.toString());
@@ -213,212 +106,48 @@ abstract class ConnectionPool<T extends RedisConnection> {
         return result;
     }
 
-    public CompletableFuture<T> get(RedisCommand<?> command, ClientConnectionsEntry entry) {
-        return acquireConnection(command, entry);
+    public CompletableFuture<T> get(RedisCommand<?> command, ClientConnectionsEntry entry, boolean trackChanges) {
+        return acquireConnection(command, entry, trackChanges);
     }
 
-    protected final CompletableFuture<T> acquireConnection(RedisCommand<?> command, ClientConnectionsEntry entry) {
-        CompletableFuture<T> result = new CompletableFuture<T>();
-
-        CompletableFuture<Void> f = acquireConnection(entry, command);
-        f.thenAccept(r -> {
-            connectTo(entry, result, command);
-        });
+    protected final CompletableFuture<T> acquireConnection(RedisCommand<?> command, ClientConnectionsEntry entry, boolean trackChanges) {
+        ConnectionsHolder<T> handler = getConnectionHolder(entry, trackChanges);
+        CompletableFuture<T> result = handler.acquireConnection(command);
+        CompletableFuture<T> cancelableFuture = new CompletableFuture<>();
         result.whenComplete((r, e) -> {
             if (e != null) {
-                f.completeExceptionally(e);
+                if (entry.getNodeType() == NodeType.SLAVE) {
+                    FailedNodeDetector detector = entry.getClient().getConfig().getFailedNodeDetector();
+                    detector.onConnectFailed(e);
+                    if (detector.isNodeFailed()) {
+                        log.error("Redis node {} has been marked as failed according to the detection logic defined in {}",
+                                        entry.getClient().getAddr(), detector);
+                        masterSlaveEntry.shutdownAndReconnectAsync(entry.getClient(), e);
+                    }
+                }
+                cancelableFuture.completeExceptionally(e);
+                return;
+            }
+
+            entry.addHandler(r, handler);
+
+            if (entry.getNodeType() == NodeType.SLAVE) {
+                entry.getClient().getConfig().getFailedNodeDetector().onConnectSuccessful();
+            }
+
+            if (!cancelableFuture.complete(r)) {
+                entry.returnConnection(r);
             }
         });
-        return result;
+        return cancelableFuture;
     }
         
-    protected boolean tryAcquireConnection(ClientConnectionsEntry entry) {
-        if (entry.getNodeType() == NodeType.SLAVE && entry.isFailed()) {
-            checkForReconnect(entry, null);
+    private boolean isHealthy(ClientConnectionsEntry entry) {
+        if (entry.getNodeType() == NodeType.SLAVE
+                && entry.getClient().getConfig().getFailedNodeDetector().isNodeFailed()) {
             return false;
         }
         return true;
-    }
-
-    protected T poll(ClientConnectionsEntry entry, RedisCommand<?> command) {
-        return (T) entry.pollConnection(command);
-    }
-
-    protected CompletionStage<T> connect(ClientConnectionsEntry entry) {
-        return (CompletionStage<T>) entry.connect();
-    }
-
-    private void connectTo(ClientConnectionsEntry entry, CompletableFuture<T> promise, RedisCommand<?> command) {
-        if (promise.isDone()) {
-            connectionManager.getGroup().submit(() -> {
-                releaseConnection(entry);
-            });
-            return;
-        }
-
-        T conn = poll(entry, command);
-        if (conn != null) {
-            if (!conn.isActive() && entry.getNodeType() == NodeType.SLAVE) {
-                entry.trySetupFistFail();
-            }
-
-            connectedSuccessful(entry, promise, conn);
-            return;
-        }
-
-        createConnection(entry, promise);
-    }
-
-    private void createConnection(ClientConnectionsEntry entry, CompletableFuture<T> promise) {
-        CompletionStage<T> connFuture = connect(entry);
-        connFuture.whenComplete((conn, e) -> {
-            if (e != null) {
-                promiseFailure(entry, promise, e);
-                return;
-            }
-
-            if (!conn.isActive()) {
-                promiseFailure(entry, promise, conn);
-                return;
-            }
-
-            if (changeUsage()) {
-                promise.thenApply(c -> c.incUsage());
-            }
-            connectedSuccessful(entry, promise, conn);
-        });
-    }
-
-    protected boolean changeUsage() {
-        return true;
-    }
-
-    private void connectedSuccessful(ClientConnectionsEntry entry, CompletableFuture<T> promise, T conn) {
-        if (conn.isActive() && entry.getNodeType() == NodeType.SLAVE) {
-            entry.resetFirstFail();
-        }
-
-        if (!promise.complete(conn)) {
-            releaseConnection(entry, conn);
-            releaseConnection(entry);
-        }
-    }
-
-    private void promiseFailure(ClientConnectionsEntry entry, CompletableFuture<T> promise, Throwable cause) {
-        if (entry.getNodeType() == NodeType.SLAVE) {
-            entry.trySetupFistFail();
-            if (entry.isFailed()) {
-                checkForReconnect(entry, cause);
-            }
-        }
-
-        releaseConnection(entry);
-
-        promise.completeExceptionally(cause);
-    }
-
-    private void promiseFailure(ClientConnectionsEntry entry, CompletableFuture<T> promise, T conn) {
-        if (entry.getNodeType() == NodeType.SLAVE) {
-            entry.trySetupFistFail();
-            if (entry.isFailed()) {
-                conn.closeAsync();
-                entry.getAllConnections().remove(conn);
-                checkForReconnect(entry, null);
-            } else {
-                releaseConnection(entry, conn);
-            }
-        } else {
-            releaseConnection(entry, conn);
-        }
-
-        releaseConnection(entry);
-
-        RedisConnectionException cause = new RedisConnectionException(conn + " is not active!");
-        promise.completeExceptionally(cause);
-    }
-
-    private void checkForReconnect(ClientConnectionsEntry entry, Throwable cause) {
-        if (masterSlaveEntry.slaveDown(entry, FreezeReason.RECONNECT)) {
-            log.error("slave " + entry.getClient().getAddr() + " has been disconnected after " 
-                        + config.getFailedSlaveCheckInterval() + " ms interval since moment of the first failed connection", cause);
-            scheduleCheck(entry);
-            }
-        }
-
-    private void scheduleCheck(ClientConnectionsEntry entry) {
-
-        connectionManager.getConnectionEventsHub().fireDisconnect(entry.getClient().getAddr());
-
-        connectionManager.newTimeout(timeout -> {
-            synchronized (entry) {
-                if (entry.getFreezeReason() != FreezeReason.RECONNECT
-                        || connectionManager.isShuttingDown()) {
-                    return;
-                }
-            }
-
-            CompletionStage<RedisConnection> connectionFuture = entry.getClient().connectAsync();
-            connectionFuture.whenComplete((c, e) -> {
-                    synchronized (entry) {
-                        if (entry.getFreezeReason() != FreezeReason.RECONNECT) {
-                            return;
-                        }
-                    }
-
-                    if (e != null) {
-                        scheduleCheck(entry);
-                        return;
-                    }
-                    if (!c.isActive()) {
-                        c.closeAsync();
-                        scheduleCheck(entry);
-                        return;
-                    }
-
-                    RFuture<String> f = c.async(RedisCommands.PING);
-                    f.whenComplete((t, ex) -> {
-                        try {
-                            synchronized (entry) {
-                                if (entry.getFreezeReason() != FreezeReason.RECONNECT) {
-                                    return;
-                                }
-                            }
-
-                            if ("PONG".equals(t)) {
-                                if (masterSlaveEntry.slaveUp(entry, FreezeReason.RECONNECT)) {
-                                    log.info("slave {} has been successfully reconnected", entry.getClient().getAddr());
-                                }
-                            } else {
-                                scheduleCheck(entry);
-                            }
-                        } finally {
-                            c.closeAsync();
-                        }
-                    });
-            });
-        }, config.getFailedSlaveReconnectionInterval(), TimeUnit.MILLISECONDS);
-    }
-
-    public void returnConnection(ClientConnectionsEntry entry, T connection) {
-        if (entry == null) {
-            connection.closeAsync();
-            return;
-        }
-        if (entry.isFreezed() && entry.getFreezeReason() != FreezeReason.SYSTEM) {
-            connection.closeAsync();
-            entry.getAllConnections().remove(connection);
-        } else {
-            releaseConnection(entry, connection);
-        }
-        releaseConnection(entry);
-    }
-
-    protected void releaseConnection(ClientConnectionsEntry entry) {
-        entry.releaseConnection();
-    }
-
-    protected void releaseConnection(ClientConnectionsEntry entry, T conn) {
-        entry.releaseConnection(conn);
     }
 
 }

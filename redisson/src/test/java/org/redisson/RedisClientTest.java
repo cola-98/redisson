@@ -1,61 +1,146 @@
 package org.redisson;
 
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.redisson.client.*;
 import org.redisson.client.codec.LongCodec;
 import org.redisson.client.codec.StringCodec;
 import org.redisson.client.protocol.CommandData;
 import org.redisson.client.protocol.CommandsData;
 import org.redisson.client.protocol.RedisCommands;
+import org.redisson.client.protocol.RedisStrictCommand;
 import org.redisson.client.protocol.pubsub.PubSubType;
+import org.redisson.config.Protocol;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class RedisClientTest {
+public class RedisClientTest  {
 
-    private RedisClient redisClient;
+    private static RedisClient redisClient;
     
     @BeforeAll
-    public static void beforeClass() throws IOException, InterruptedException {
-        if (!RedissonRuntimeEnvironment.isTravis) {
-            RedisRunner.startDefaultRedisServerInstance();
-        }
-    }
-
-    @AfterAll
-    public static void afterClass() throws IOException, InterruptedException {
-        if (!RedissonRuntimeEnvironment.isTravis) {
-            RedisRunner.shutDownDefaultRedisServerInstance();
-        }
-    }
-
-    @BeforeEach
-    public void before() throws IOException, InterruptedException {
-        if (RedissonRuntimeEnvironment.isTravis) {
-            RedisRunner.startDefaultRedisServerInstance();
-        }
+    public static void beforeAll() {
         RedisClientConfig config = new RedisClientConfig();
-        config.setAddress(RedisRunner.getDefaultRedisServerBindAddressAndPort());
+        config.setProtocol(Protocol.RESP3);
+        config.setAddress("redis://127.0.0.1:" + RedisDockerTest.REDIS.getFirstMappedPort());
         redisClient = RedisClient.create(config);
     }
 
-    @AfterEach
-    public void after() throws InterruptedException {
-        if (RedissonRuntimeEnvironment.isTravis) {
-            RedisRunner.shutDownDefaultRedisServerInstance();
-        }
+    @AfterAll
+    public static void afterAll() {
         redisClient.shutdown();
     }
 
     @Test
-    public void testConnectAsync() throws InterruptedException {
+    public void testUsername() {
+        RedisClientConfig cc = redisClient.getConfig();
+
+        RedisConnection c = redisClient.connect();
+        c.sync(new RedisStrictCommand<Void>("ACL"), "SETUSER", "testuser", "on", ">123456", "~*", "allcommands");
+        c.close();
+
+        cc.setUsername("testuser");
+        cc.setPassword("123456");
+        RedisClient client = RedisClient.create(cc);
+        RedisConnection c2 = client.connect();
+        assertThat(c2.sync(RedisCommands.PING)).isEqualTo("PONG");
+        client.shutdown();
+    }
+
+    @Test
+    public void testClientTrackingBroadcast() throws InterruptedException, ExecutionException {
+        RedisPubSubConnection c = redisClient.connectPubSub();
+        c.sync((RedisCommands.CLIENT_TRACKING), "ON", "BCAST");
+        AtomicInteger counter = new AtomicInteger();
+        c.addListener(new RedisPubSubListener<String>() {
+            @Override
+            public void onMessage(CharSequence channel, String msg) {
+                counter.incrementAndGet();
+            }
+        });
+        c.subscribe(StringCodec.INSTANCE, new ChannelName("__redis__:invalidate")).get();
+        c.sync(RedisCommands.GET, "test");
+
+        RedisPubSubConnection c4 = redisClient.connectPubSub();
+        c4.sync((RedisCommands.CLIENT_TRACKING), "ON", "BCAST");
+        c4.addListener(new RedisPubSubListener<String>() {
+            @Override
+            public void onMessage(CharSequence channel, String msg) {
+                counter.incrementAndGet();
+            }
+        });
+        c4.subscribe(StringCodec.INSTANCE, new ChannelName("__redis__:invalidate")).get();
+        c4.sync(RedisCommands.GET, "test");
+
+        RedisConnection c3 = redisClient.connect();
+        c3.sync(RedisCommands.SET, "test", "1234");
+        Thread.sleep(500);
+        assertThat(counter.get()).isEqualTo(2);
+
+        counter.set(0);
+        c3.sync(RedisCommands.SET, "test", "1235");
+        Thread.sleep(500);
+        assertThat(counter.get()).isEqualTo(2);
+
+        counter.set(0);
+        c4.sync(RedisCommands.SET, "test", "1236");
+        Thread.sleep(500);
+        assertThat(counter.get()).isEqualTo(2);
+    }
+
+        @Test
+    public void testClientTracking() throws InterruptedException, ExecutionException {
+        RedisPubSubConnection c = redisClient.connectPubSub();
+        c.sync((RedisCommands.CLIENT_TRACKING), "ON");
+        AtomicInteger counter = new AtomicInteger();
+        c.addListener(new RedisPubSubListener<String>() {
+            @Override
+            public void onMessage(CharSequence channel, String msg) {
+                counter.incrementAndGet();
+            }
+        });
+        c.subscribe(StringCodec.INSTANCE, new ChannelName("__redis__:invalidate")).get();
+        c.sync(RedisCommands.GET, "test");
+
+        RedisPubSubConnection c4 = redisClient.connectPubSub();
+        c4.sync((RedisCommands.CLIENT_TRACKING), "ON");
+        c4.addListener(new RedisPubSubListener<String>() {
+            @Override
+            public void onMessage(CharSequence channel, String msg) {
+                counter.incrementAndGet();
+            }
+        });
+        c4.subscribe(StringCodec.INSTANCE, new ChannelName("__redis__:invalidate")).get();
+        c4.sync(RedisCommands.GET, "test");
+
+        RedisConnection c3 = redisClient.connect();
+        c3.sync(RedisCommands.SET, "test", "1234");
+        Thread.sleep(500);
+        assertThat(counter.get()).isEqualTo(2);
+
+        counter.set(0);
+        c.sync(RedisCommands.GET, "test");
+        c3.sync(RedisCommands.SET, "test", "1235");
+        Thread.sleep(500);
+        assertThat(counter.get()).isEqualTo(1);
+
+        counter.set(0);
+        c4.sync(RedisCommands.GET, "test");
+        c4.sync(RedisCommands.SET, "test", "1235");
+        Thread.sleep(500);
+        assertThat(counter.get()).isEqualTo(1);
+    }
+
+    @Test
+    public void testConnectAsync() throws InterruptedException, ExecutionException {
         CompletionStage<RedisConnection> f = redisClient.connectAsync();
         CountDownLatch l = new CountDownLatch(2);
         f.whenComplete((conn, e) -> {
@@ -77,11 +162,10 @@ public class RedisClientTest {
         pubSubConnection.addListener(new RedisPubSubListener<Object>() {
 
             @Override
-            public boolean onStatus(PubSubType type, CharSequence channel) {
+            public void onStatus(PubSubType type, CharSequence channel) {
                 assertThat(type).isEqualTo(PubSubType.SUBSCRIBE);
                 assertThat(Arrays.asList("test1", "test2").contains(channel.toString())).isTrue();
                 latch.countDown();
-                return true;
             }
 
             @Override

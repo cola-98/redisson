@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,5 +37,10 @@ public enum TransportMode {
      * Use KQUEUE transport. Requires <b>netty-transport-native-kqueue</b> lib in classpath.
      */
     KQUEUE,
+
+    /**
+     * Use `io_uring` transport. Requires <b>netty-transport-io_uring</b> lib in classpath.
+     */
+    IO_URING,
 
 }

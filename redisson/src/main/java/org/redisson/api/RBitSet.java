@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -240,6 +240,14 @@ public interface RBitSet extends RExpirable, RBitSetAsync {
     void set(BitSet bs);
 
     /**
+     * Set all bits to <code>value</code> which index in indexArray
+     *
+     * @param indexArray The index array of bits that needs to be set to <code>value</code>
+     * @param value true = 1, false = 0
+     */
+    void set(long[] indexArray, boolean value);
+
+    /**
      * Executes NOT operation over all bits
      */
     void not();
@@ -267,6 +275,14 @@ public interface RBitSet extends RExpirable, RBitSetAsync {
      * @return <code>true</code> if bit set to one and <code>false</code> overwise.
      */
     boolean get(long bitIndex);
+    
+    /**
+     * Returns a boolean array where each element of the array corresponds to the query result of the input parameters.
+     *
+     * @param bitIndexes indexes of bit
+     * @return Returns a boolean array where each element of the array corresponds to the query result of the input parameters.
+     */
+    boolean[] get(long... bitIndexes);
 
     /**
      * Set bit to one at specified bitIndex

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,7 +63,7 @@ public class RedissonExtension implements Extension {
                 .scope(ApplicationScoped.class)
                 .addQualifiers(qualifiers)
                 .addTransitiveTypeClosure(RedissonClient.class)
-                .produceWith((instance) -> {
+                .produceWith(instance -> {
 
                     String instanceName = "default";
                     if (qualifier instanceof Named) {

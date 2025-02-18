@@ -2,7 +2,7 @@ package org.redisson.transaction;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.redisson.BaseTest;
+import org.redisson.RedisDockerTest;
 import org.redisson.api.RMap;
 import org.redisson.api.RTransaction;
 import org.redisson.api.TransactionOptions;
@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public abstract class RedissonBaseTransactionalMapTest extends BaseTest {
+public abstract class RedissonBaseTransactionalMapTest extends RedisDockerTest {
 
     protected abstract RMap<String, String> getMap();
     
@@ -216,6 +216,15 @@ public abstract class RedissonBaseTransactionalMapTest extends BaseTest {
         assertThat(m.get("5")).isEqualTo("8");
     }
 
+    @Test
+    public void testFastRemove() {
+        RTransaction transaction = redisson.createTransaction(TransactionOptions.defaults());
+        RMap<String, String> map = getTransactionalMap(transaction);
+        assertThat(map.fastPut("1", "2")).isTrue();
+        assertThat(map.fastRemove("1")).isEqualTo(1);
+        transaction.commit();
+        assertThat(redisson.getKeys().count()).isZero();
+    }
     
     @Test
     public void testRemove() {

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import org.redisson.api.RShardedTopic;
 import org.redisson.api.listener.MessageListener;
 import org.redisson.client.RedisPubSubListener;
 import org.redisson.client.codec.Codec;
+import org.redisson.client.codec.LongCodec;
 import org.redisson.client.codec.StringCodec;
 import org.redisson.client.protocol.RedisCommands;
 import org.redisson.client.protocol.pubsub.PubSubType;
@@ -50,6 +51,10 @@ public class RedissonShardedTopic extends RedissonTopic implements RShardedTopic
         super(codec, commandExecutor, nameMapper, name);
     }
 
+    public static RedissonTopic createRaw(Codec codec, CommandAsyncExecutor commandExecutor, String name) {
+        return new RedissonShardedTopic(codec, commandExecutor, NameMapper.direct(), name);
+    }
+
     @Override
     protected RFuture<Integer> addListenerAsync(RedisPubSubListener<?> pubSubListener) {
         CompletableFuture<PubSubConnectionEntry> future = subscribeService.ssubscribe(codec, channelName, pubSubListener);
@@ -61,7 +66,7 @@ public class RedissonShardedTopic extends RedissonTopic implements RShardedTopic
 
     @Override
     public RFuture<Long> publishAsync(Object message) {
-        String name = getName(message);
+        String name = getName();
         return commandExecutor.writeAsync(name, StringCodec.INSTANCE, RedisCommands.SPUBLISH, name, commandExecutor.encode(codec, message));
     }
 
@@ -77,6 +82,7 @@ public class RedissonShardedTopic extends RedissonTopic implements RShardedTopic
         return new CompletableFutureWrapper<>(f);
     }
 
+    @Override
     public RFuture<Void> removeAllListenersAsync() {
         CompletableFuture<Void> f = subscribeService.removeAllListenersAsync(PubSubType.SUNSUBSCRIBE, channelName);
         return new CompletableFutureWrapper<>(f);
@@ -84,6 +90,6 @@ public class RedissonShardedTopic extends RedissonTopic implements RShardedTopic
 
     @Override
     public RFuture<Long> countSubscribersAsync() {
-        throw new UnsupportedOperationException("Sharded PUBSUB doesn't support this operation");
+        return commandExecutor.writeAsync(name, LongCodec.INSTANCE, RedisCommands.PUBSUB_SHARDNUMSUB, channelName);
     }
 }

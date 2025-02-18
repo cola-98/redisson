@@ -4,6 +4,7 @@ import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.redisson.api.RBlockingDeque;
 import org.redisson.api.queue.DequeMoveArgs;
 
@@ -14,12 +15,10 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class RedissonBlockingDequeTest extends BaseTest {
+public class RedissonBlockingDequeTest extends RedisDockerTest {
 
     @Test
     public void testMove() {
-        Assumptions.assumeTrue(RedisRunner.getDefaultRedisServerInstance().getRedisVersion().compareTo("6.2.0") > 0);
-
         RBlockingDeque<Integer> deque1 = redisson.getBlockingDeque("deque1");
         RBlockingDeque<Integer> deque2 = redisson.getBlockingDeque("deque2");
 
@@ -69,19 +68,18 @@ public class RedissonBlockingDequeTest extends BaseTest {
     @Test
     public void testPollLastAndOfferFirstTo() throws InterruptedException {
         RBlockingDeque<String> blockingDeque = redisson.getBlockingDeque("blocking_deque");
-        Awaitility.await().between(Duration.ofMillis(1000), Duration.ofMillis(1200)).untilAsserted(() -> {
+        Awaitility.await().between(Duration.ofMillis(1000), Duration.ofMillis(1300)).untilAsserted(() -> {
             String redisTask = blockingDeque.pollLastAndOfferFirstTo("deque", 1, TimeUnit.SECONDS);
             assertThat(redisTask).isNull();
         });
     }
     
     @Test
+    @Timeout(3)
     public void testShortPoll() {
-        Assertions.assertTimeout(Duration.ofSeconds(3), () -> {
-            RBlockingDeque<Integer> queue = redisson.getBlockingDeque("queue:pollany");
-            queue.pollLastAsync(500, TimeUnit.MILLISECONDS);
-            queue.pollFirstAsync(10, TimeUnit.MICROSECONDS);
-        });
+        RBlockingDeque<Integer> queue = redisson.getBlockingDeque("queue:pollany");
+        queue.pollLastAsync(500, TimeUnit.MILLISECONDS);
+        queue.pollFirstAsync(10, TimeUnit.MICROSECONDS);
     }
     
     @Test

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,40 +29,10 @@ public class PubSubStatusListener implements RedisPubSubListener<Object> {
     private final StatusListener listener;
     private final String name;
 
-    public String getName() {
-        return name;
-    }
-
     public PubSubStatusListener(StatusListener listener, String name) {
         super();
         this.listener = listener;
         this.name = name;
-    }
-
-    @Override
-    @SuppressWarnings("AvoidInlineConditionals")
-    public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + ((listener == null) ? 0 : listener.hashCode());
-        return result;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj)
-            return true;
-        if (obj == null)
-            return false;
-        if (getClass() != obj.getClass())
-            return false;
-        PubSubStatusListener other = (PubSubStatusListener) obj;
-        if (listener == null) {
-            if (other.listener != null)
-                return false;
-        } else if (!listener.equals(other.listener))
-            return false;
-        return true;
     }
 
     @Override
@@ -74,16 +44,22 @@ public class PubSubStatusListener implements RedisPubSubListener<Object> {
     }
 
     @Override
-    public boolean onStatus(PubSubType type, CharSequence channel) {
+    public void onStatus(PubSubType type, CharSequence channel) {
         if (channel.toString().equals(name)) {
-            if (type == PubSubType.SUBSCRIBE) {
+            if (type == PubSubType.SUBSCRIBE || type == PubSubType.SSUBSCRIBE || type == PubSubType.PSUBSCRIBE) {
                 listener.onSubscribe(channel.toString());
-            } else if (type == PubSubType.UNSUBSCRIBE) {
+            } else if (type == PubSubType.UNSUBSCRIBE || type == PubSubType.SUNSUBSCRIBE || type == PubSubType.PUNSUBSCRIBE) {
                 listener.onUnsubscribe(channel.toString());
             }
-            return true;
         }
-        return false;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public StatusListener getListener() {
+        return listener;
     }
 
 }

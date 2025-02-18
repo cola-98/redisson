@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -68,6 +68,11 @@ public class RedissonSetMultimapValues<V> extends RedissonExpirable implements R
     }
 
     @Override
+    public List<V> containsEach(Collection<V> c) {
+        throw new UnsupportedOperationException("This operation is not supported for SetMultimap values");
+    }
+
+    @Override
     public RFuture<Boolean> tryAddAsync(V... values) {
         return set.tryAddAsync(values);
     }
@@ -129,6 +134,11 @@ public class RedissonSetMultimapValues<V> extends RedissonExpirable implements R
     }
 
     @Override
+    public RFuture<Boolean> copyAsync(List<Object> keys, int database, boolean replace) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public RFuture<Integer> sizeAsync() {
         return commandExecutor.evalReadAsync(getRawName(), codec, RedisCommands.EVAL_INTEGER,
                       "local expireDate = 92233720368547758; " +
@@ -170,7 +180,7 @@ public class RedissonSetMultimapValues<V> extends RedissonExpirable implements R
          System.currentTimeMillis(), encodeMapKey(key), encodeMapValue(o));
     }
 
-    private ListScanResult<Object> scanIterator(RedisClient client, long startPos, String pattern, int count) {
+    private ListScanResult<Object> scanIterator(RedisClient client, String startPos, String pattern, int count) {
         List<Object> params = new ArrayList<Object>();
         params.add(System.currentTimeMillis());
         params.add(startPos);
@@ -230,7 +240,7 @@ public class RedissonSetMultimapValues<V> extends RedissonExpirable implements R
         return new RedissonBaseIterator<V>() {
 
             @Override
-            protected ScanResult<Object> iterator(RedisClient client, long nextIterPos) {
+            protected ScanResult<Object> iterator(RedisClient client, String nextIterPos) {
                 return distributedScanIterator(iteratorName, pattern, count);
             }
 
@@ -253,7 +263,7 @@ public class RedissonSetMultimapValues<V> extends RedissonExpirable implements R
         }
         args.add(count);
 
-        return commandExecutor.evalWriteAsync(getRawName(), codec, RedisCommands.EVAL_SSCAN,
+        return commandExecutor.evalWriteAsync(getRawName(), codec, RedisCommands.EVAL_SCAN,
                 "local cursor = redis.call('get', KEYS[3]); "
                 + "if cursor ~= false then "
                     + "cursor = tonumber(cursor); "
@@ -295,7 +305,7 @@ public class RedissonSetMultimapValues<V> extends RedissonExpirable implements R
         return new RedissonBaseIterator<V>() {
 
             @Override
-            protected ListScanResult<Object> iterator(RedisClient client, long nextIterPos) {
+            protected ListScanResult<Object> iterator(RedisClient client, String nextIterPos) {
                 return scanIterator(client, nextIterPos, pattern, count);
             }
 
@@ -382,7 +392,7 @@ public class RedissonSetMultimapValues<V> extends RedissonExpirable implements R
 
     @Override
     public RFuture<V> randomAsync() {
-        return commandExecutor.writeAsync(getRawName(), codec, RedisCommands.SRANDMEMBER_SINGLE, getRawName());
+        return commandExecutor.readAsync(getRawName(), codec, RedisCommands.SRANDMEMBER_SINGLE, getRawName());
     }
 
     @Override
@@ -392,7 +402,7 @@ public class RedissonSetMultimapValues<V> extends RedissonExpirable implements R
 
     @Override
     public RFuture<Set<V>> randomAsync(int count) {
-        return commandExecutor.writeAsync(getRawName(), codec, RedisCommands.SRANDMEMBER, getRawName(), count);
+        return commandExecutor.readAsync(getRawName(), codec, RedisCommands.SRANDMEMBER, getRawName(), count);
     }
     
     @Override
@@ -449,7 +459,7 @@ public class RedissonSetMultimapValues<V> extends RedissonExpirable implements R
               + "end; " +
                 "local s = redis.call('smembers', KEYS[2]);" +
                         "for i = 1, #s, 1 do " +
-                            "for j = 2, #ARGV, 1 do "
+                            "for j = #ARGV, 3, -1 do "
                             + "if ARGV[j] == s[i] "
                             + "then table.remove(ARGV, j) end "
                         + "end; "
@@ -499,6 +509,11 @@ public class RedissonSetMultimapValues<V> extends RedissonExpirable implements R
     }
 
     @Override
+    public RFuture<List<V>> containsEachAsync(Collection<V> c) {
+        throw new UnsupportedOperationException("This operation is not supported for SetMultimap values");
+    }
+
+    @Override
     public boolean retainAll(Collection<?> c) {
         return get(retainAllAsync(c));
     }
@@ -526,7 +541,7 @@ public class RedissonSetMultimapValues<V> extends RedissonExpirable implements R
                        + "while i <= #s do "
                             + "local element = s[i] "
                             + "local isInAgrs = false "
-                            + "for j = 2, #ARGV, 1 do "
+                            + "for j = 3, #ARGV, 1 do "
                                 + "if ARGV[j] == element then "
                                     + "isInAgrs = true "
                                     + "break "
@@ -560,7 +575,7 @@ public class RedissonSetMultimapValues<V> extends RedissonExpirable implements R
                       + "end; " +
                 
                         "local v = 0 " +
-                        "for i = 2, #ARGV, 1 do "
+                        "for i = 3, #ARGV, 1 do "
                             + "if redis.call('srem', KEYS[2], ARGV[i]) == 1 "
                             + "then v = 1 end "
                         +"end "
@@ -610,9 +625,9 @@ public class RedissonSetMultimapValues<V> extends RedissonExpirable implements R
 
     @Override
     public RFuture<Integer> unionAsync(String... names) {
-        List<Object> args = new ArrayList<Object>(names.length + 1);
+        List<Object> args = new ArrayList<>(names.length + 1);
         args.add(getRawName());
-        args.addAll(Arrays.asList(names));
+        args.addAll(map(names));
         return commandExecutor.writeAsync(getRawName(), codec, RedisCommands.SUNIONSTORE_INT, args.toArray());
     }
 
@@ -623,9 +638,9 @@ public class RedissonSetMultimapValues<V> extends RedissonExpirable implements R
 
     @Override
     public RFuture<Set<V>> readUnionAsync(String... names) {
-        List<Object> args = new ArrayList<Object>(names.length + 1);
+        List<Object> args = new ArrayList<>(names.length + 1);
         args.add(getRawName());
-        args.addAll(Arrays.asList(names));
+        args.addAll(map(names));
         return commandExecutor.writeAsync(getRawName(), codec, RedisCommands.SUNION, args.toArray());
     }
 
@@ -641,9 +656,9 @@ public class RedissonSetMultimapValues<V> extends RedissonExpirable implements R
 
     @Override
     public RFuture<Integer> diffAsync(String... names) {
-        List<Object> args = new ArrayList<Object>(names.length + 1);
+        List<Object> args = new ArrayList<>(names.length + 1);
         args.add(getRawName());
-        args.addAll(Arrays.asList(names));
+        args.addAll(map(names));
         return commandExecutor.writeAsync(getRawName(), codec, RedisCommands.SDIFFSTORE_INT, args.toArray());
     }
 
@@ -654,9 +669,9 @@ public class RedissonSetMultimapValues<V> extends RedissonExpirable implements R
 
     @Override
     public RFuture<Set<V>> readDiffAsync(String... names) {
-        List<Object> args = new ArrayList<Object>(names.length + 1);
+        List<Object> args = new ArrayList<>(names.length + 1);
         args.add(getRawName());
-        args.addAll(Arrays.asList(names));
+        args.addAll(map(names));
         return commandExecutor.writeAsync(getRawName(), codec, RedisCommands.SDIFF, args.toArray());
     }
 
@@ -667,9 +682,9 @@ public class RedissonSetMultimapValues<V> extends RedissonExpirable implements R
 
     @Override
     public RFuture<Integer> intersectionAsync(String... names) {
-        List<Object> args = new ArrayList<Object>(names.length + 1);
+        List<Object> args = new ArrayList<>(names.length + 1);
         args.add(getRawName());
-        args.addAll(Arrays.asList(names));
+        args.addAll(map(names));
         return commandExecutor.writeAsync(getRawName(), codec, RedisCommands.SINTERSTORE_INT, args.toArray());
     }
 
@@ -680,9 +695,9 @@ public class RedissonSetMultimapValues<V> extends RedissonExpirable implements R
 
     @Override
     public RFuture<Set<V>> readIntersectionAsync(String... names) {
-        List<Object> args = new ArrayList<Object>(names.length + 1);
+        List<Object> args = new ArrayList<>(names.length + 1);
         args.add(getRawName());
-        args.addAll(Arrays.asList(names));
+        args.addAll(map(names));
         return commandExecutor.writeAsync(getRawName(), codec, RedisCommands.SINTER, args.toArray());
     }
 
@@ -706,7 +721,7 @@ public class RedissonSetMultimapValues<V> extends RedissonExpirable implements R
         List<Object> args = new ArrayList<>(names.length + 1);
         args.add(names.length + 1);
         args.add(getRawName());
-        args.addAll(Arrays.asList(names));
+        args.addAll(map(names));
         if (limit > 0) {
             args.add("LIMIT");
             args.add(limit);

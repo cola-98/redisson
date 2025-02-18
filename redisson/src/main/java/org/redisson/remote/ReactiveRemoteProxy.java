@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,17 +15,15 @@
  */
 package org.redisson.remote;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.ConcurrentMap;
-
 import org.redisson.client.codec.Codec;
 import org.redisson.command.CommandAsyncExecutor;
 import org.redisson.executor.RemotePromise;
 import org.redisson.misc.CompletableFutureWrapper;
 import org.redisson.reactive.CommandReactiveExecutor;
-
 import reactor.core.publisher.Mono;
+
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * 
@@ -35,12 +33,17 @@ import reactor.core.publisher.Mono;
 public class ReactiveRemoteProxy extends AsyncRemoteProxy {
 
     public ReactiveRemoteProxy(CommandAsyncExecutor commandExecutor, String name, String responseQueueName,
-            ConcurrentMap<String, ResponseEntry> responses, Codec codec, String executorId,
-            String cancelRequestMapName, BaseRemoteService remoteService) {
-        super(commandExecutor, name, responseQueueName, responses, codec, executorId, cancelRequestMapName,
-                remoteService);
+                                Codec codec, String executorId, String cancelRequestMapName, BaseRemoteService remoteService) {
+        super(convert(commandExecutor), name, responseQueueName, codec, executorId, cancelRequestMapName, remoteService);
     }
-    
+
+    private static CommandAsyncExecutor convert(CommandAsyncExecutor commandExecutor) {
+        if (commandExecutor instanceof CommandReactiveExecutor) {
+            return commandExecutor;
+        }
+        return CommandReactiveExecutor.create(commandExecutor.getConnectionManager(), commandExecutor.getObjectBuilder());
+    }
+
     @Override
     protected List<Class<?>> permittedClasses() {
         return Arrays.asList(Mono.class);

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package org.redisson.api.stream;
 import org.redisson.api.StreamMessageId;
 
 import java.time.Duration;
-import java.util.Collections;
 
 /**
  * Arguments object for RStream.readGroup() methods.
@@ -38,15 +37,16 @@ public interface StreamReadGroupArgs {
     /**
      * Defines stream data size limit.
      *
-     * @param count - stream data size limit
+     * @param count stream data size limit
      * @return arguments object
      */
     StreamReadGroupArgs count(int count);
 
     /**
      * Defines time interval to wait for stream data availability.
+     * <code>0</code> is used to wait infinitely.
      *
-     * @param timeout - timeout duration
+     * @param timeout timeout duration
      * @return arguments object
      */
     StreamReadGroupArgs timeout(Duration timeout);
@@ -65,11 +65,11 @@ public interface StreamReadGroupArgs {
      * Defines to return messages of current Stream
      * with ids greater than defined message id.
      *
-     * @param id - message id
+     * @param id message id
      * @return arguments object
      */
     static StreamReadGroupArgs greaterThan(StreamMessageId id) {
-        return new BaseStreamReadGroupArgs(id, Collections.emptyMap());
+        return new StreamReadGroupParams(id);
     }
 
 }

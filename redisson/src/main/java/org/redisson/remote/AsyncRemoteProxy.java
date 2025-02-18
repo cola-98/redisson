@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,7 +39,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -52,8 +51,8 @@ public class AsyncRemoteProxy extends BaseRemoteProxy {
     protected final String cancelRequestMapName;
     
     public AsyncRemoteProxy(CommandAsyncExecutor commandExecutor, String name, String responseQueueName,
-            ConcurrentMap<String, ResponseEntry> responses, Codec codec, String executorId, String cancelRequestMapName, BaseRemoteService remoteService) {
-        super(commandExecutor, name, responseQueueName, responses, codec, executorId, remoteService);
+                            Codec codec, String executorId, String cancelRequestMapName, BaseRemoteService remoteService) {
+        super(commandExecutor, name, responseQueueName, codec, executorId, remoteService);
         this.cancelRequestMapName = cancelRequestMapName;
     }
     

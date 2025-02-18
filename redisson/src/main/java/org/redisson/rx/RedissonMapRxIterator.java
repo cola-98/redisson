@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,7 +50,7 @@ public class RedissonMapRxIterator<K, V, M> {
         ReplayProcessor<M> p = ReplayProcessor.create();
         return p.doOnRequest(new LongConsumer() {
 
-            private long nextIterPos;
+            private String nextIterPos = "0";
             private RedisClient client;
             private AtomicLong elementsRead = new AtomicLong();
             
@@ -76,7 +76,7 @@ public class RedissonMapRxIterator<K, V, M> {
 
                     if (finished) {
                         client = null;
-                        nextIterPos = 0;
+                        nextIterPos = "0";
                         return;
                     }
 
@@ -95,7 +95,7 @@ public class RedissonMapRxIterator<K, V, M> {
                         completed = true;
                         return;
                     }
-                    if (res.getPos() == 0 && !tryAgain()) {
+                    if ("0".equals(res.getPos()) && !tryAgain()) {
                         finished = true;
                         p.onComplete();
                     }

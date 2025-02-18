@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,13 +18,14 @@ package org.redisson.api.listener;
 import org.redisson.api.ObjectListener;
 
 /**
- * Redisson Object Event listener for <b>lset</b> event published by Redis.
+ * Redisson Object Event listener for <b>linsert</b> event published by Redis.
  * <p>
  * Redis notify-keyspace-events setting should contain El letters
  *
  * @author Nikita Koksharov
  *
  */
+@FunctionalInterface
 public interface ListInsertListener extends ObjectListener {
 
     /**

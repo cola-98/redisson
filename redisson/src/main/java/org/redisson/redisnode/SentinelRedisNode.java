@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,12 +25,15 @@ import org.redisson.client.codec.LongCodec;
 import org.redisson.client.codec.StringCodec;
 import org.redisson.client.protocol.RedisCommand;
 import org.redisson.client.protocol.RedisCommands;
+import org.redisson.client.protocol.RedisStrictCommand;
 import org.redisson.client.protocol.Time;
+import org.redisson.client.protocol.decoder.RedisURIDecoder;
 import org.redisson.command.CommandAsyncExecutor;
 import org.redisson.misc.CompletableFutureWrapper;
 import org.redisson.misc.RedisURI;
 
 import java.net.InetSocketAddress;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -222,7 +225,10 @@ public class SentinelRedisNode implements RedisSentinel, RedisSentinelAsync {
 
     @Override
     public RFuture<RedisURI> getMasterAddrAsync(String masterName) {
-        return executeAsync(null, StringCodec.INSTANCE, -1, RedisCommands.SENTINEL_GET_MASTER_ADDR_BY_NAME, masterName);
+        RedisStrictCommand<RedisURI> masterHostCommand = new RedisStrictCommand<>("SENTINEL", "GET-MASTER-ADDR-BY-NAME",
+                new RedisURIDecoder(client.getConfig().getAddress().getScheme()));
+
+        return executeAsync(null, StringCodec.INSTANCE, -1, masterHostCommand, masterName);
     }
 
     @Override
@@ -268,6 +274,66 @@ public class SentinelRedisNode implements RedisSentinel, RedisSentinelAsync {
     @Override
     public RFuture<Void> setConfigAsync(String parameter, String value) {
         return executeAsync(null, StringCodec.INSTANCE, -1, RedisCommands.CONFIG_SET, parameter, value);
+    }
+
+    @Override
+    public void bgSave() {
+        commandAsyncService.get(bgSaveAsync());
+    }
+
+    @Override
+    public void scheduleBgSave() {
+        commandAsyncService.get(scheduleBgSaveAsync());
+    }
+
+    @Override
+    public void save() {
+        commandAsyncService.get(saveAsync());
+    }
+
+    @Override
+    public Instant getLastSaveTime() {
+        return commandAsyncService.get(getLastSaveTimeAsync());
+    }
+
+    @Override
+    public RFuture<Void> bgSaveAsync() {
+        return executeAsync(null, StringCodec.INSTANCE, -1, RedisCommands.BGSAVE);
+    }
+
+    @Override
+    public RFuture<Void> scheduleBgSaveAsync() {
+        return executeAsync(null, StringCodec.INSTANCE, -1, RedisCommands.BGSAVE, "SCHEDULE");
+    }
+
+    @Override
+    public RFuture<Void> saveAsync() {
+        return executeAsync(null, StringCodec.INSTANCE, -1, RedisCommands.SAVE);
+    }
+
+    @Override
+    public RFuture<Instant> getLastSaveTimeAsync() {
+        return executeAsync(null, StringCodec.INSTANCE, -1, RedisCommands.LASTSAVE_INSTANT);
+    }
+
+    @Override
+    public void bgRewriteAOF() {
+        commandAsyncService.get(bgRewriteAOFAsync());
+    }
+
+    @Override
+    public RFuture<Void> bgRewriteAOFAsync() {
+        return executeAsync(null, StringCodec.INSTANCE, -1, RedisCommands.BGREWRITEAOF);
+    }
+
+    @Override
+    public long size() {
+        return commandAsyncService.get(sizeAsync());
+    }
+
+    @Override
+    public RFuture<Long> sizeAsync() {
+        return executeAsync(null, StringCodec.INSTANCE, -1, RedisCommands.DBSIZE);
     }
 
 }

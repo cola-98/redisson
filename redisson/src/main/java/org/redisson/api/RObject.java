@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,27 @@ public interface RObject extends RObjectAsync {
     Long getIdleTime();
 
     /**
-     * Returns bytes amount used by object in Redis memory. 
+     * Returns count of references over this object.
+     *
+     * @return count of reference
+     */
+    int getReferenceCount();
+
+    /**
+     * Returns the logarithmic access frequency counter over this object.
+     *
+     * @return frequency counter
+     */
+    int getAccessFrequency();
+
+    /**
+     * Returns the internal encoding for the Redis object
+     *
+     * @return internal encoding
+     */
+    ObjectEncoding getInternalEncoding();
+    /**
+     * Returns bytes amount used by object in Redis memory.
      * 
      * @return size in bytes
      */
@@ -106,7 +126,41 @@ public interface RObject extends RObjectAsync {
      * @param timeout - maximum idle time in any moment of the communication with the destination instance in milliseconds
      */
     void copy(String host, int port, int database, long timeout);
-    
+
+    /**
+     * Copy this object instance to the new instance with a defined name.
+     *
+     * @param destination name of the destination instance
+     * @return <code>true</code> if this object instance was copied else <code>false</code>
+     */
+    boolean copy(String destination);
+
+    /**
+     * Copy this object instance to the new instance with a defined name and database.
+     *
+     * @param destination name of the destination instance
+     * @param database database number
+     * @return <code>true</code> if this object instance was copied else <code>false</code>
+     */
+    boolean copy(String destination, int database);
+
+    /**
+     * Copy this object instance to the new instance with a defined name, and replace it if it already exists.
+     *
+     * @param destination name of the destination instance
+     * @return <code>true</code> if this object instance was copied else <code>false</code>
+     */
+    boolean copyAndReplace(String destination);
+
+    /**
+     * Copy this object instance to the new instance with a defined name and database, and replace it if it already exists.
+     *
+     * @param destination name of the destination instance
+     * @param database database number
+     * @return <code>true</code> if this object instance was copied else <code>false</code>
+     */
+    boolean copyAndReplace(String destination, int database);
+
     /**
      * Move object to another database
      *
@@ -148,7 +202,7 @@ public interface RObject extends RObjectAsync {
 
     /**
      * Rename current object key to <code>newName</code>
-     * only if new key is not exists
+     * only if new key doesn't exist.
      *
      * @param newName - new name of object
      * @return <code>true</code> if object has been renamed successfully and <code>false</code> otherwise

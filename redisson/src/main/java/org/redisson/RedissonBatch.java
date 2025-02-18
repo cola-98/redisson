@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ public class RedissonBatch implements RBatch {
     private final CommandBatchService executorService;
 
     public RedissonBatch(EvictionScheduler evictionScheduler, CommandAsyncExecutor executor, BatchOptions options) {
-        this.executorService = new CommandBatchService(executor, options);
+        this.executorService = executor.createCommandBatchService(options);
         this.evictionScheduler = evictionScheduler;
     }
 
@@ -49,7 +49,7 @@ public class RedissonBatch implements RBatch {
     }
 
     @Override
-    public <V> RJsonBucketAsync<V> getJsonBucket(String name, JsonCodec<V> codec) {
+    public <V> RJsonBucketAsync<V> getJsonBucket(String name, JsonCodec codec) {
         return new RedissonJsonBucket<>(codec, executorService, name);
     }
 
@@ -194,6 +194,16 @@ public class RedissonBatch implements RBatch {
     }
 
     @Override
+    public <K, V> RMapCacheNativeAsync<K, V> getMapCacheNative(String name) {
+        return new RedissonMapCacheNative<>(executorService, name, null, null, null);
+    }
+
+    @Override
+    public <K, V> RMapCacheNativeAsync<K, V> getMapCacheNative(String name, Codec codec) {
+        return new RedissonMapCacheNative<>(codec, executorService, name, null, null, null);
+    }
+
+    @Override
     public RScriptAsync getScript() {
         return new RedissonScript(executorService);
     }
@@ -216,6 +226,16 @@ public class RedissonBatch implements RBatch {
     @Override
     public RKeysAsync getKeys() {
         return new RedissonKeys(executorService);
+    }
+
+    @Override
+    public RSearchAsync getSearch() {
+        return new RedissonSearch(executorService);
+    }
+
+    @Override
+    public RSearchAsync getSearch(Codec codec) {
+        return new RedissonSearch(codec, executorService);
     }
 
     @Override
@@ -290,12 +310,32 @@ public class RedissonBatch implements RBatch {
 
     @Override
     public <K, V> RMultimapCacheAsync<K, V> getListMultimapCache(String name) {
-        return new RedissonListMultimapCache<K, V>(evictionScheduler, executorService, name);
+        return new RedissonListMultimapCache<>(evictionScheduler, executorService, name);
     }
     
     @Override
     public <K, V> RMultimapCacheAsync<K, V> getListMultimapCache(String name, Codec codec) {
-        return new RedissonListMultimapCache<K, V>(evictionScheduler, codec, executorService, name);
+        return new RedissonListMultimapCache<>(evictionScheduler, codec, executorService, name);
+    }
+
+    @Override
+    public <K, V> RMultimapCacheAsync<K, V> getListMultimapCacheNative(String name) {
+        return new RedissonListMultimapCacheNative<>(executorService, name);
+    }
+
+    @Override
+    public <K, V> RMultimapCacheAsync<K, V> getListMultimapCacheNative(String name, Codec codec) {
+        return new RedissonListMultimapCacheNative<>(codec, executorService, name);
+    }
+
+    @Override
+    public <K, V> RMultimapCacheAsync<K, V> getSetMultimapCacheNative(String name) {
+        return new RedissonSetMultimapCacheNative<>(executorService, name);
+    }
+
+    @Override
+    public <K, V> RMultimapCacheAsync<K, V> getSetMultimapCacheNative(String name, Codec codec) {
+        return new RedissonSetMultimapCacheNative<>(codec, executorService, name);
     }
 
     @Override

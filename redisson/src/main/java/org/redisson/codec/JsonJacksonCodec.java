@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,7 +65,7 @@ public class JsonJacksonCodec extends BaseCodec {
     public static final JsonJacksonCodec INSTANCE = new JsonJacksonCodec();
 
     @JsonIdentityInfo(generator=ObjectIdGenerators.IntSequenceGenerator.class, property="@id")
-    @JsonAutoDetect(fieldVisibility = Visibility.ANY, 
+    @JsonAutoDetect(fieldVisibility = Visibility.NON_PRIVATE,
                     getterVisibility = Visibility.PUBLIC_ONLY, 
                     setterVisibility = Visibility.NONE, 
                     isGetterVisibility = Visibility.NONE)
@@ -120,17 +120,21 @@ public class JsonJacksonCodec extends BaseCodec {
         }
         warmedup = true;
 
+        ByteBuf d = null;
         try {
-            ByteBuf d = getValueEncoder().encode("testValue");
+            d = getValueEncoder().encode("testValue");
             getValueDecoder().decode(d, null);
-            d.release();
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            if (d != null) {
+                d.release();
+            }
         }
     }
 
     protected static ObjectMapper createObjectMapper(ClassLoader classLoader, ObjectMapper om) {
-        TypeFactory tf = TypeFactory.defaultInstance().withClassLoader(classLoader);
+        TypeFactory tf = om.getTypeFactory().withClassLoader(classLoader);
         om.setTypeFactory(tf);
         return om;
     }

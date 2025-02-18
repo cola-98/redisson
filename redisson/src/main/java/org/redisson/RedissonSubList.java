@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -87,10 +87,10 @@ public class RedissonSubList<V> extends RedissonList<V> implements RList<V> {
         encode(params, c);
         return commandExecutor.evalReadAsync(getRawName(), codec, RedisCommands.EVAL_BOOLEAN,
                 "local fromIndex = table.remove(ARGV, 1);" +
-                "local toIndex = table.remove(ARGV, 2);" +
+                "local toIndex = table.remove(ARGV, 1);" +
                 "local items = redis.call('lrange', KEYS[1], tonumber(fromIndex), tonumber(toIndex)) " +
                 "for i=1, #items do " +
-                    "for j = 1, #ARGV, 1 do " +
+                    "for j = #ARGV, 1, -1 do " +
                         "if items[i] == ARGV[j] then " +
                             "table.remove(ARGV, j) " +
                         "end " +
@@ -163,14 +163,14 @@ public class RedissonSubList<V> extends RedissonList<V> implements RList<V> {
         return commandExecutor.evalWriteAsync(getRawName(), codec, RedisCommands.EVAL_BOOLEAN,
                 "local v = 0; " +
                 "local fromIndex = table.remove(ARGV, 1);" +
-                "local toIndex = table.remove(ARGV, 2);" +
-                "local count = table.remove(ARGV, 3);" +
+                "local toIndex = table.remove(ARGV, 1);" +
+                "local count = table.remove(ARGV, 1);" +
                 "local items = redis.call('lrange', KEYS[1], fromIndex, toIndex); " +
 
                 "for i=1, #items do " +
                     "for j = 1, #ARGV, 1 do " +
                         "if items[i] == ARGV[j] then " +
-                            "redis.call('lrem', KEYS[1], count, ARGV[i]); " +
+                            "redis.call('lrem', KEYS[1], count, ARGV[j]); " +
                             "v = 1; " +
                         "end; " +
                     "end; " +
@@ -189,7 +189,7 @@ public class RedissonSubList<V> extends RedissonList<V> implements RList<V> {
         return commandExecutor.evalWriteAsync(getRawName(), codec, RedisCommands.EVAL_BOOLEAN,
                 "local changed = 0 " +
                 "local fromIndex = table.remove(ARGV, 1);" +
-                "local toIndex = table.remove(ARGV, 2);" +
+                "local toIndex = table.remove(ARGV, 1);" +
                 "local items = redis.call('lrange', KEYS[1], fromIndex, toIndex) "
                    + "local i = 1 "
                    + "while i <= #items do "
@@ -329,13 +329,13 @@ public class RedissonSubList<V> extends RedissonList<V> implements RList<V> {
     public RFuture<Integer> lastIndexOfAsync(Object o) {
         return commandExecutor.evalReadAsync(getRawName(), codec, RedisCommands.EVAL_INTEGER,
                 "local key = KEYS[1] " +
-                "local obj = ARGV[1] " +
+                "local obj = table.remove(ARGV, 1);" +
                 "local fromIndex = table.remove(ARGV, 1);" +
-                "local toIndex = table.remove(ARGV, 2);" +
-                "local items = redis.call('lrange', key, tonumber(fromIndex), tonumber(toIndexs)) " +
-                "for i = #items, 0, -1 do " +
+                "local toIndex = table.remove(ARGV, 1);" +
+                "local items = redis.call('lrange', key, fromIndex, toIndex) " +
+                "for i = #items, 1, -1 do " +
                     "if items[i] == obj then " +
-                        "return tonumber(ARGV[2]) + i - 1 " +
+                        "return tonumber(fromIndex) + i - 1; " +
                     "end; " +
                 "end; " +
                 "return -1; ",

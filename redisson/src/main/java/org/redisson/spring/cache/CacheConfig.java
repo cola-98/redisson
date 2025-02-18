@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,11 +15,16 @@
  */
 package org.redisson.spring.cache;
 
+import org.redisson.api.EvictionMode;
+import org.redisson.api.map.event.MapEntryListener;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -35,6 +40,10 @@ public class CacheConfig {
     private long maxIdleTime;
     
     private int maxSize;
+
+    private EvictionMode evictionMode = EvictionMode.LRU;
+
+    private final List<MapEntryListener> listeners = new ArrayList<>();
 
     /**
      * Creates config object with
@@ -73,7 +82,6 @@ public class CacheConfig {
     public void setTTL(long ttl) {
         this.ttl = ttl;
     }
-
     
     public int getMaxSize() {
         return maxSize;
@@ -87,6 +95,21 @@ public class CacheConfig {
      */
     public void setMaxSize(int maxSize) {
         this.maxSize = maxSize;
+    }
+
+    public EvictionMode getEvictionMode() {
+        return evictionMode;
+    }
+
+    /**
+     * Set the eviction mode of the map. Superfluous elements are evicted using LRU or LFU algorithm.
+     *
+     * @param evictionMode - eviction mode (LRU, LFU)
+     * @return
+     */
+    public CacheConfig setEvictionMode(EvictionMode evictionMode) {
+        this.evictionMode = evictionMode;
+        return this;
     }
 
     public long getMaxIdleTime() {
@@ -103,6 +126,24 @@ public class CacheConfig {
         this.maxIdleTime = maxIdleTime;
     }
 
+    /**
+     * listener will invoke if one of the ttl,maxIdleTime,maxSize is set
+     * listener Is one of the following implementations:
+     * EntryCreatedListener
+     * EntryExpiredListener
+     * EntryRemovedListener
+     * EntryUpdatedListener
+     *
+     * @param listener listener
+     */
+    public void addListener(MapEntryListener listener) {
+        listeners.add(listener);
+    }
+    
+    public List<MapEntryListener> getListeners() {
+        return listeners;
+    }
+    
     /**
      * Read config objects stored in JSON format from <code>String</code>
      *

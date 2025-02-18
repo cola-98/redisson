@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,18 +17,17 @@ package org.redisson;
 
 import org.redisson.api.LockOptions;
 import org.redisson.api.RFuture;
-import org.redisson.client.RedisException;
 import org.redisson.client.codec.LongCodec;
 import org.redisson.client.protocol.RedisCommands;
 import org.redisson.client.protocol.RedisStrictCommand;
 import org.redisson.command.CommandAsyncExecutor;
 import org.redisson.misc.CompletableFutureWrapper;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Distributed implementation of {@link java.util.concurrent.locks.Lock}
@@ -41,7 +40,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * @author Danila Varatyntsev
  */
-public class RedissonSpinLock extends RedissonBaseLock {
+public final class RedissonSpinLock extends RedissonBaseLock {
 
     protected long internalLockLeaseTime;
 
@@ -49,11 +48,11 @@ public class RedissonSpinLock extends RedissonBaseLock {
 
     final CommandAsyncExecutor commandExecutor;
 
-    public RedissonSpinLock(CommandAsyncExecutor commandExecutor, String name,
+    RedissonSpinLock(CommandAsyncExecutor commandExecutor, String name,
                             LockOptions.BackOff backOff) {
         super(commandExecutor, name);
         this.commandExecutor = commandExecutor;
-        this.internalLockLeaseTime = commandExecutor.getConnectionManager().getCfg().getLockWatchdogTimeout();
+        this.internalLockLeaseTime = getServiceManager().getCfg().getLockWatchdogTimeout();
         this.backOff = backOff;
     }
 
@@ -102,10 +101,16 @@ public class RedissonSpinLock extends RedissonBaseLock {
 
     private <T> RFuture<Long> tryAcquireAsync(long leaseTime, TimeUnit unit, long threadId) {
         if (leaseTime > 0) {
-            return tryLockInnerAsync(leaseTime, unit, threadId, RedisCommands.EVAL_LONG);
+            RFuture<Long> acquiredFuture = tryLockInnerAsync(leaseTime, unit, threadId, RedisCommands.EVAL_LONG);
+            CompletionStage<Long> s = handleNoSync(threadId, acquiredFuture);
+            return new CompletableFutureWrapper<>(s);
         }
         RFuture<Long> ttlRemainingFuture = tryLockInnerAsync(internalLockLeaseTime,
                 TimeUnit.MILLISECONDS, threadId, RedisCommands.EVAL_LONG);
+
+        CompletionStage<Long> s = handleNoSync(threadId, ttlRemainingFuture);
+        ttlRemainingFuture = new CompletableFutureWrapper<>(s);
+
         ttlRemainingFuture.thenAccept(ttlRemaining -> {
             // lock acquired
             if (ttlRemaining == null) {
@@ -123,7 +128,7 @@ public class RedissonSpinLock extends RedissonBaseLock {
     <T> RFuture<T> tryLockInnerAsync(long leaseTime, TimeUnit unit, long threadId, RedisStrictCommand<T> command) {
         internalLockLeaseTime = unit.toMillis(leaseTime);
 
-        return evalWriteAsync(getRawName(), LongCodec.INSTANCE, command,
+        return commandExecutor.syncedEvalNoRetry(getRawName(), LongCodec.INSTANCE, command,
                 "if (redis.call('exists', KEYS[1]) == 0) then " +
                         "redis.call('hincrby', KEYS[1], ARGV[2], 1); " +
                         "redis.call('pexpire', KEYS[1], ARGV[1]); " +
@@ -140,31 +145,28 @@ public class RedissonSpinLock extends RedissonBaseLock {
 
     @Override
     public boolean tryLock(long waitTime, long leaseTime, TimeUnit unit) throws InterruptedException {
-        long time = unit.toMillis(waitTime);
-        long current = System.currentTimeMillis();
-        long threadId = Thread.currentThread().getId();
+        final long time = unit.toMillis(waitTime);
+        final long current = System.currentTimeMillis();
+        final long threadId = Thread.currentThread().getId();
         Long ttl = tryAcquire(leaseTime, unit, threadId);
         // lock acquired
         if (ttl == null) {
             return true;
         }
 
-        time -= System.currentTimeMillis() - current;
-        if (time <= 0) {
+        if (System.currentTimeMillis() - current >= time) {
             acquireFailed(waitTime, unit, threadId);
             return false;
         }
 
         LockOptions.BackOffPolicy backOffPolicy = backOff.create();
         while (true) {
-            current = System.currentTimeMillis();
             Thread.sleep(backOffPolicy.getNextSleepPeriod());
             ttl = tryAcquire(leaseTime, unit, threadId);
             if (ttl == null) {
                 return true;
             }
-            time -= System.currentTimeMillis() - current;
-            if (time <= 0) {
+            if (System.currentTimeMillis() - current >= time) {
                 acquireFailed(waitTime, unit, threadId);
                 return false;
             }
@@ -177,27 +179,17 @@ public class RedissonSpinLock extends RedissonBaseLock {
     }
 
     @Override
-    public void unlock() {
-        try {
-            get(unlockAsync(Thread.currentThread().getId()));
-        } catch (RedisException e) {
-            if (e.getCause() instanceof IllegalMonitorStateException) {
-                throw (IllegalMonitorStateException) e.getCause();
-            } else {
-                throw e;
-            }
+    protected void cancelExpirationRenewal(Long threadId, Boolean unlockResult) {
+        super.cancelExpirationRenewal(threadId, unlockResult);
+        if (unlockResult == null || unlockResult) {
+            internalLockLeaseTime = getServiceManager().getCfg().getLockWatchdogTimeout();
         }
     }
 
     @Override
-    public boolean forceUnlock() {
-        return get(forceUnlockAsync());
-    }
-
-    @Override
     public RFuture<Boolean> forceUnlockAsync() {
-        cancelExpirationRenewal(null);
-        return evalWriteAsync(getRawName(), LongCodec.INSTANCE, RedisCommands.EVAL_BOOLEAN,
+        cancelExpirationRenewal(null, null);
+        return commandExecutor.syncedEvalWithRetry(getRawName(), LongCodec.INSTANCE, RedisCommands.EVAL_BOOLEAN,
                 "if (redis.call('del', KEYS[1]) == 1) then "
                         + "return 1 "
                         + "else "
@@ -207,37 +199,28 @@ public class RedissonSpinLock extends RedissonBaseLock {
     }
 
 
-    protected RFuture<Boolean> unlockInnerAsync(long threadId) {
-        return evalWriteAsync(getRawName(), LongCodec.INSTANCE, RedisCommands.EVAL_BOOLEAN,
-                "if (redis.call('hexists', KEYS[1], ARGV[2]) == 0) then " +
+    protected RFuture<Boolean> unlockInnerAsync(long threadId, String requestId, int timeout) {
+        return evalWriteSyncedNoRetryAsync(getRawName(), LongCodec.INSTANCE, RedisCommands.EVAL_BOOLEAN,
+                "local val = redis.call('get', KEYS[2]); " +
+                      "if val ~= false then " +
+                        "return tonumber(val);" +
+                      "end; " +
+
+                      "if (redis.call('hexists', KEYS[1], ARGV[2]) == 0) then " +
                         "return nil;" +
-                        "end; " +
-                        "local counter = redis.call('hincrby', KEYS[1], ARGV[2], -1); " +
-                        "if (counter > 0) then " +
+                      "end; " +
+                      "local counter = redis.call('hincrby', KEYS[1], ARGV[2], -1); " +
+                      "if (counter > 0) then " +
                         "redis.call('pexpire', KEYS[1], ARGV[1]); " +
+                        "redis.call('set', KEYS[2], 0, 'px', ARGV[3]); " +
                         "return 0; " +
-                        "else " +
+                      "else " +
                         "redis.call('del', KEYS[1]); " +
+                        "redis.call('set', KEYS[2], 1, 'px', ARGV[3]); " +
                         "return 1; " +
-                        "end; " +
-                        "return nil;",
-                Collections.singletonList(getRawName()), internalLockLeaseTime, getLockName(threadId));
-    }
-
-    @Override
-    public RFuture<Void> lockAsync() {
-        return lockAsync(-1, null);
-    }
-
-    @Override
-    public RFuture<Void> lockAsync(long leaseTime, TimeUnit unit) {
-        long currentThreadId = Thread.currentThread().getId();
-        return lockAsync(leaseTime, unit, currentThreadId);
-    }
-
-    @Override
-    public RFuture<Void> lockAsync(long currentThreadId) {
-        return lockAsync(-1, null, currentThreadId);
+                      "end; ",
+                Arrays.asList(getRawName(), getUnlockLatchName(requestId)),
+                internalLockLeaseTime, getLockName(threadId), timeout);
     }
 
     @Override
@@ -267,15 +250,10 @@ public class RedissonSpinLock extends RedissonBaseLock {
             }
 
             long nextSleepPeriod = backOffPolicy.getNextSleepPeriod();
-            commandExecutor.getConnectionManager().newTimeout(
+            getServiceManager().newTimeout(
                     timeout -> lockAsync(leaseTime, unit, currentThreadId, result, backOffPolicy),
                     nextSleepPeriod, TimeUnit.MILLISECONDS);
         });
-    }
-
-    @Override
-    public RFuture<Boolean> tryLockAsync() {
-        return tryLockAsync(Thread.currentThread().getId());
     }
 
     @Override
@@ -286,31 +264,18 @@ public class RedissonSpinLock extends RedissonBaseLock {
     }
 
     @Override
-    public RFuture<Boolean> tryLockAsync(long waitTime, TimeUnit unit) {
-        return tryLockAsync(waitTime, -1, unit);
-    }
-
-    @Override
-    public RFuture<Boolean> tryLockAsync(long waitTime, long leaseTime, TimeUnit unit) {
-        long currentThreadId = Thread.currentThread().getId();
-        return tryLockAsync(waitTime, leaseTime, unit, currentThreadId);
-    }
-
-    @Override
     public RFuture<Boolean> tryLockAsync(long waitTime, long leaseTime, TimeUnit unit,
                                          long currentThreadId) {
         CompletableFuture<Boolean> result = new CompletableFuture<>();
 
-        AtomicLong time = new AtomicLong(unit.toMillis(waitTime));
         LockOptions.BackOffPolicy backOffPolicy = backOff.create();
 
-        tryLock(leaseTime, unit, currentThreadId, result, time, backOffPolicy);
+        tryLock(System.currentTimeMillis(), leaseTime, unit, currentThreadId, result, unit.toMillis(waitTime), backOffPolicy);
         return new CompletableFutureWrapper<>(result);
     }
 
-    private void tryLock(long leaseTime, TimeUnit unit, long currentThreadId, CompletableFuture<Boolean> result,
-                         AtomicLong time, LockOptions.BackOffPolicy backOffPolicy) {
-        long startTime = System.currentTimeMillis();
+    private void tryLock(long startTime, long leaseTime, TimeUnit unit, long currentThreadId, CompletableFuture<Boolean> result,
+                         long waitTime, LockOptions.BackOffPolicy backOffPolicy) {
         RFuture<Long> ttlFuture = tryAcquireAsync(leaseTime, unit, currentThreadId);
         ttlFuture.whenComplete((ttl, e) -> {
             if (e != null) {
@@ -326,17 +291,14 @@ public class RedissonSpinLock extends RedissonBaseLock {
                 return;
             }
 
-            long el = System.currentTimeMillis() - startTime;
-            time.addAndGet(-el);
-
-            if (time.get() <= 0) {
+            if (System.currentTimeMillis() - startTime >= waitTime) {
                 trySuccessFalse(currentThreadId, result);
                 return;
             }
 
             long nextSleepPeriod = backOffPolicy.getNextSleepPeriod();
-            commandExecutor.getConnectionManager().newTimeout(
-                    timeout -> tryLock(leaseTime, unit, currentThreadId, result, time, backOffPolicy),
+            getServiceManager().newTimeout(
+                    timeout -> tryLock(startTime, leaseTime, unit, currentThreadId, result, waitTime, backOffPolicy),
                     nextSleepPeriod, TimeUnit.MILLISECONDS);
         });
     }

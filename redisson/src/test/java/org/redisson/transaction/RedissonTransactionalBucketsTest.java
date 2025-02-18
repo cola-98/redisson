@@ -1,7 +1,7 @@
 package org.redisson.transaction;
 
 import org.junit.jupiter.api.Test;
-import org.redisson.BaseTest;
+import org.redisson.RedisDockerTest;
 import org.redisson.api.RBucket;
 import org.redisson.api.RBuckets;
 import org.redisson.api.RTransaction;
@@ -12,7 +12,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class RedissonTransactionalBucketsTest extends BaseTest {
+public class RedissonTransactionalBucketsTest extends RedisDockerTest {
 
     @Test
     public void testGet() {

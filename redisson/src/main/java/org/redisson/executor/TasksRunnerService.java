@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package org.redisson.executor;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import org.redisson.RedissonExecutorService;
 import org.redisson.RedissonShutdownException;
@@ -34,17 +35,16 @@ import org.redisson.executor.params.*;
 import org.redisson.misc.Hash;
 import org.redisson.misc.HashValue;
 import org.redisson.misc.Injector;
-import org.redisson.remote.ResponseEntry;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectInput;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -56,7 +56,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class TasksRunnerService implements RemoteExecutorService {
 
-    private static final Map<HashValue, Codec> CODECS = new LRUCacheMap<HashValue, Codec>(500, 0, 0);
+    private static final Map<HashValue, Codec> CODECS = new LRUCacheMap<>(500, 0, 0);
     
     private final Codec codec;
     private final String name;
@@ -74,14 +74,11 @@ public class TasksRunnerService implements RemoteExecutorService {
     private String tasksExpirationTimeName;
 
     private TasksInjector tasksInjector;
-    private ConcurrentMap<String, ResponseEntry> responses;
-    
-    public TasksRunnerService(CommandAsyncExecutor commandExecutor, RedissonClient redisson, Codec codec, String name, ConcurrentMap<String, ResponseEntry> responses) {
+
+    public TasksRunnerService(CommandAsyncExecutor commandExecutor, RedissonClient redisson, Codec codec, String name) {
         this.commandExecutor = commandExecutor;
         this.name = name;
         this.redisson = redisson;
-        this.responses = responses;
-        
         this.codec = codec;
     }
 
@@ -125,6 +122,10 @@ public class TasksRunnerService implements RemoteExecutorService {
     public void scheduleAtFixedRate(ScheduledAtFixedRateParameters params) {
         long start = System.nanoTime();
         executeRunnable(params, false);
+        if (!redisson.getMap(tasksName, StringCodec.INSTANCE).containsKey(params.getRequestId())) {
+            return;
+        }
+
         long spent = params.getSpentTime()
                                 + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
 
@@ -138,23 +139,17 @@ public class TasksRunnerService implements RemoteExecutorService {
     @Override
     public void schedule(ScheduledCronExpressionParameters params) {
         CronExpression expression = new CronExpression(params.getCronExpression());
-        ZonedDateTime currentDate = ZonedDateTime.of(LocalDateTime.now(), ZoneId.of(params.getTimezone()));
-        ZonedDateTime nextStartDate = expression.nextTimeAfter(currentDate);
-        RFuture<Void> future = null;
-        if (nextStartDate != null) {
-            RemoteExecutorServiceAsync service = asyncScheduledServiceAtFixed(params.getExecutorId(), params.getRequestId());
-            params.setStartTime(nextStartDate.toInstant().toEpochMilli());
-            future = service.schedule(params);
+        expression.setTimeZone(TimeZone.getTimeZone(params.getTimezone()));
+        Date nextStartDate = expression.getNextValidTimeAfter(new Date());
+
+        executeRunnable(params, nextStartDate == null);
+
+        if (nextStartDate == null || !redisson.getMap(tasksName, StringCodec.INSTANCE).containsKey(params.getRequestId())) {
+            return;
         }
-        try {
-            executeRunnable(params, nextStartDate == null);
-        } catch (Exception e) {
-            // cancel task if it throws an exception
-            if (future != null) {
-                future.cancel(true);
-            }
-            throw e;
-        }
+
+        params.setStartTime(nextStartDate.getTime());
+        asyncScheduledServiceAtFixed(params.getExecutorId(), params.getRequestId()).schedule(params);
     }
 
     /**
@@ -164,7 +159,7 @@ public class TasksRunnerService implements RemoteExecutorService {
      * @return
      */
     private RemoteExecutorServiceAsync asyncScheduledServiceAtFixed(String executorId, String requestId) {
-        ScheduledTasksService scheduledRemoteService = new ScheduledTasksService(codec, name, commandExecutor, executorId, responses);
+        ScheduledTasksService scheduledRemoteService = new ScheduledTasksService(codec, name, commandExecutor, executorId);
         scheduledRemoteService.setTerminationTopicName(terminationTopicName);
         scheduledRemoteService.setTasksCounterName(tasksCounterName);
         scheduledRemoteService.setStatusName(statusName);
@@ -181,9 +176,6 @@ public class TasksRunnerService implements RemoteExecutorService {
     @Override
     public void scheduleWithFixedDelay(ScheduledWithFixedDelayParameters params) {
         executeRunnable(params, false);
-        if (!redisson.getMap(tasksName, StringCodec.INSTANCE).containsKey(params.getRequestId())) {
-            return;
-        }
         
         long newStartTime = System.currentTimeMillis() + params.getDelay();
         params.setStartTime(newStartTime);
@@ -234,7 +226,7 @@ public class TasksRunnerService implements RemoteExecutorService {
             return;
         }
 
-        commandExecutor.getConnectionManager().newTimeout(timeout -> renewRetryTime(requestId),
+        commandExecutor.getServiceManager().newTimeout(timeout -> renewRetryTime(requestId),
                                                     Math.max(1000, retryInterval / 2), TimeUnit.MILLISECONDS);
     }
 
@@ -243,10 +235,10 @@ public class TasksRunnerService implements RemoteExecutorService {
                 // check if executor service not in shutdown state
                   "local name = ARGV[2];"
                 + "local scheduledName = ARGV[2];"
-                + "if string.sub(scheduledName, 1, 2) ~= 'ff' then "
-                    + "scheduledName = 'ff' .. scheduledName; "
+                + "if string.sub(scheduledName, 1, 3) ~= 'ff:' then "
+                    + "scheduledName = 'ff:' .. scheduledName; "
                 + "else "
-                    + "name = string.sub(name, 3, string.len(name)); "
+                    + "name = string.sub(name, 4, string.len(name)); "
                 + "end;"
                 + "local retryInterval = redis.call('get', KEYS[4]);"
                 
@@ -256,7 +248,7 @@ public class TasksRunnerService implements RemoteExecutorService {
                     + "local v = redis.call('zrange', KEYS[2], 0, 0); "
                     // if new task added to queue head then publish its startTime 
                     // to all scheduler workers 
-                    + "if v[1] == ARGV[2] then "
+                    + "if v[1] == scheduledName then "
                         + "redis.call('publish', KEYS[3], startTime); "
                     + "end;"
                     + "return retryInterval; "
@@ -276,6 +268,20 @@ public class TasksRunnerService implements RemoteExecutorService {
         });
         return future;
     }
+
+    private HashValue hash(ClassLoader classLoader, String className) throws IOException {
+        String classAsPath = className.replace('.', '/') + ".class";
+        InputStream classStream = classLoader.getResourceAsStream(classAsPath);
+        if (classStream == null) {
+            return HashValue.EMPTY;
+        }
+
+        ByteBuf out = ByteBufAllocator.DEFAULT.buffer();
+        out.writeBytes(classStream, classStream.available());
+        HashValue hash = new HashValue(Hash.hash128(out));
+        out.release();
+        return hash;
+    }
     
     @SuppressWarnings("unchecked")
     private <T> T decode(TaskParameters params) {
@@ -285,10 +291,15 @@ public class TasksRunnerService implements RemoteExecutorService {
             HashValue hash = new HashValue(Hash.hash128(classBodyBuf));
             Codec classLoaderCodec = CODECS.get(hash);
             if (classLoaderCodec == null) {
-                RedissonClassLoader cl = new RedissonClassLoader(codec.getClassLoader());
-                cl.loadClass(params.getClassName(), params.getClassBody());
-                
-                classLoaderCodec = this.codec.getClass().getConstructor(ClassLoader.class).newInstance(cl);
+                HashValue v = hash(codec.getClassLoader(), params.getClassName());
+                if (v.equals(hash)) {
+                    classLoaderCodec = codec;
+                } else {
+                    RedissonClassLoader cl = new RedissonClassLoader(codec.getClassLoader());
+                    cl.loadClass(params.getClassName(), params.getClassBody());
+
+                    classLoaderCodec = this.codec.getClass().getConstructor(ClassLoader.class).newInstance(cl);
+                }
                 CODECS.put(hash, classLoaderCodec);
             }
             
@@ -381,9 +392,10 @@ public class TasksRunnerService implements RemoteExecutorService {
            script +=  "local scheduled = redis.call('zscore', KEYS[5], ARGV[3]);"
                     + "if scheduled == false then "
                         + "redis.call('hdel', KEYS[4], ARGV[3]); "
+                        + "redis.call('zrem', KEYS[7], ARGV[3]); "
                     + "end;";
         }
-        script += "redis.call('zrem', KEYS[5], 'ff' .. ARGV[3]);" +
+        script += "redis.call('zrem', KEYS[5], 'ff:' .. ARGV[3]);" +
                   "if redis.call('decr', KEYS[1]) == 0 then "
                    + "redis.call('del', KEYS[1]);"
                     + "if redis.call('get', KEYS[2]) == ARGV[1] then "
@@ -395,7 +407,7 @@ public class TasksRunnerService implements RemoteExecutorService {
 
         RFuture<Object> f = commandExecutor.evalWriteNoRetryAsync(name, StringCodec.INSTANCE, RedisCommands.EVAL_VOID,
                 script,
-                Arrays.asList(tasksCounterName, statusName, terminationTopicName, tasksName, schedulerQueueName, tasksRetryIntervalName),
+                Arrays.asList(tasksCounterName, statusName, terminationTopicName, tasksName, schedulerQueueName, tasksRetryIntervalName, tasksExpirationTimeName),
                 RedissonExecutorService.SHUTDOWN_STATE, RedissonExecutorService.TERMINATED_STATE, requestId);
         commandExecutor.get(f);
     }

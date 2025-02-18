@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -164,8 +164,18 @@ public interface RMapAsync<K, V> extends RExpirableAsync {
     /**
      * Adds the given <code>delta</code> to the current value
      * by mapped <code>key</code>.
-     *
-     * Works only for <b>numeric</b> values!
+     * <p>
+     * Works only with codecs below
+     * <p>
+     * {@link org.redisson.codec.JsonJacksonCodec},
+     * <p>
+     * {@link org.redisson.client.codec.StringCodec},
+     * <p>
+     * {@link org.redisson.client.codec.IntegerCodec},
+     * <p>
+     * {@link org.redisson.client.codec.DoubleCodec}
+     * <p>
+     * {@link org.redisson.client.codec.LongCodec}
      *
      * @param key - map key
      * @param delta the value to add
@@ -410,5 +420,26 @@ public interface RMapAsync<K, V> extends RExpirableAsync {
      *         Previous value if key already exists in the hash and new value has been stored.
      */
     RFuture<V> putIfExistsAsync(K key, V value);
+
+    /**
+     * Clears map without removing options data used during map creation.
+     *
+     * @return <code>true</code> if map was cleared <code>false</code> if not
+     */
+    RFuture<Boolean> clearAsync();
+
+    /**
+     * Adds object event listener
+     *
+     * @see org.redisson.api.listener.TrackingListener
+     * @see org.redisson.api.listener.MapPutListener
+     * @see org.redisson.api.listener.MapRemoveListener
+     * @see org.redisson.api.ExpiredObjectListener
+     * @see org.redisson.api.DeletedObjectListener
+     *
+     * @param listener - object event listener
+     * @return listener id
+     */
+    RFuture<Integer> addListenerAsync(ObjectListener listener);
 
 }

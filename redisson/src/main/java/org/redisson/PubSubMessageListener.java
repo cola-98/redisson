@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2021 Nikita Koksharov
+ * Copyright (c) 2013-2024 Nikita Koksharov
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,32 +42,6 @@ public class PubSubMessageListener<V> implements RedisPubSubListener<Object> {
         this.name = name;
     }
 
-    @Override
-    @SuppressWarnings("AvoidInlineConditionals")
-    public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + ((listener == null) ? 0 : listener.hashCode());
-        return result;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj)
-            return true;
-        if (obj == null)
-            return false;
-        if (getClass() != obj.getClass())
-            return false;
-        PubSubMessageListener other = (PubSubMessageListener) obj;
-        if (listener == null) {
-            if (other.listener != null)
-                return false;
-        } else if (!listener.equals(other.listener))
-            return false;
-        return true;
-    }
-    
     public MessageListener<V> getListener() {
         return listener;
     }
@@ -89,8 +63,7 @@ public class PubSubMessageListener<V> implements RedisPubSubListener<Object> {
     }
 
     @Override
-    public boolean onStatus(PubSubType type, CharSequence channel) {
-        return false;
+    public void onStatus(PubSubType type, CharSequence channel) {
     }
 
 }
